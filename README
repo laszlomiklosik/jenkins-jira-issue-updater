@@ -1,0 +1,1 @@
+This is a Jenkins plugin which makes possible updating issues in Jira (change status, add comment, update issue fields) as part of a Jenkins job.
