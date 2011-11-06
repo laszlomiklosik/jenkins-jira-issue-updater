@@ -51,8 +51,6 @@ public class JiraIssueUpdater extends Builder {
 
     @Override
     public boolean perform(AbstractBuild build, Launcher launcher, BuildListener listener) {
-        // This is where you 'build' the project.
-        // Since this is a dummy, we just say 'hello world' and call that a build.
 
         // This also shows how you can consult the global configuration of the builder
         if (getDescriptor().useFrench())
@@ -115,7 +113,7 @@ public class JiraIssueUpdater extends Builder {
          * This human readable name is used in the configuration screen.
          */
         public String getDisplayName() {
-            return "Say hello world";
+            return "Jira Issue Updater";
         }
 
         @Override
