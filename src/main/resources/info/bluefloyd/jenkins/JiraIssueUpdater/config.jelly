@@ -4,12 +4,25 @@
 
     See global.jelly for a general discussion about jelly script.
   -->
-
-  <!--
-    Creates a text field that shows the value of the "name" property.
-    When submitted, it will be passed to the corresponding constructor parameter.
-  -->
-  <f:entry title="Name" field="name">
+  
+  <f:entry title="Jira SOAP URL" field="soapUrl">
     <f:textbox />
   </f:entry>
+  
+  <f:entry title="Jira Username" field="userName">
+    <f:textbox />
+  </f:entry>
+  
+  <f:entry title="Jira Password" field="password">
+    <f:textbox />
+  </f:entry>
+  
+  <f:entry title="JQL for selecting issues to be updated" field="jql">
+    <f:textbox />
+  </f:entry>
+  
+  <f:entry title="Name of the workflow action to be executed" field="workflowActionName">
+    <f:textbox />
+  </f:entry>
+  
 </j:jelly>
