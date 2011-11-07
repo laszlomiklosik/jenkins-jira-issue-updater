@@ -25,4 +25,8 @@
     <f:textbox />
   </f:entry>
   
+  <f:entry title="Jira comment to be added" field="comment">
+    <f:textbox />
+  </f:entry>
+  
 </j:jelly>

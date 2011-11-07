@@ -1,31 +1,29 @@
 package info.bluefloyd.jenkins;
 
-import hudson.Launcher;
 import hudson.Extension;
-import hudson.util.FormValidation;
-import hudson.model.AbstractBuild;
+import hudson.Launcher;
 import hudson.model.BuildListener;
+import hudson.model.AbstractBuild;
 import hudson.model.AbstractProject;
-import hudson.tasks.Builder;
 import hudson.tasks.BuildStepDescriptor;
+import hudson.tasks.Builder;
+import hudson.util.FormValidation;
 import info.bluefloyd.jira.SOAPClient;
 import info.bluefloyd.jira.SOAPSession;
-import net.sf.json.JSONObject;
-import org.kohsuke.stapler.DataBoundConstructor;
-import org.kohsuke.stapler.StaplerRequest;
-import org.kohsuke.stapler.QueryParameter;
 
-import com.atlassian.jira.rpc.soap.client.JiraSoapService;
-import com.atlassian.jira.rpc.soap.client.RemoteField;
-import com.atlassian.jira.rpc.soap.client.RemoteIssue;
-
-import javax.servlet.ServletException;
 import java.io.IOException;
 import java.util.List;
 
+import javax.servlet.ServletException;
+
+import org.kohsuke.stapler.DataBoundConstructor;
+import org.kohsuke.stapler.QueryParameter;
+import org.kohsuke.stapler.StaplerRequest;
+
+import com.atlassian.jira.rpc.soap.client.JiraSoapService;
+import com.atlassian.jira.rpc.soap.client.RemoteIssue;
+
 /**
- * Sample {@link Builder}.
- * 
  * <p>
  * When the user configures the project and enables this builder,
  * {@link DescriptorImpl#newInstance(StaplerRequest)} is invoked and a new
@@ -38,7 +36,7 @@ import java.util.List;
  * {@link #perform(AbstractBuild, Launcher, BuildListener)} method will be
  * invoked.
  * 
- * @author Kohsuke Kawaguchi
+ * @author Laszlo Miklosik
  */
 public class JiraIssueUpdater extends Builder {
 
@@ -47,16 +45,18 @@ public class JiraIssueUpdater extends Builder {
 	private final String password;
 	private final String jql;
 	private final String workflowActionName;
+	private final String comment;
 
 	// Fields in config.jelly must match the parameter names in the
 	// "DataBoundConstructor"
 	@DataBoundConstructor
-	public JiraIssueUpdater(String soapUrl, String userName, String password, String jql, String workflowActionName) {
+	public JiraIssueUpdater(String soapUrl, String userName, String password, String jql, String workflowActionName, String comment) {
 		this.soapUrl = soapUrl;
 		this.userName = userName;
 		this.password = password;
 		this.jql = jql;
 		this.workflowActionName = workflowActionName;
+		this.comment = comment;
 	}
 
 	/**
@@ -94,53 +94,33 @@ public class JiraIssueUpdater extends Builder {
 		return workflowActionName;
 	}
 
+	/**
+	 * @return the comment
+	 */
+	public String getComment() {
+		return comment;
+	}
+
 	@Override
-	public boolean perform(AbstractBuild build, Launcher launcher, BuildListener listener) {
-		// This also shows how you can consult the global configuration of the
-		// builder
-		if (getDescriptor().useFrench())
-			listener.getLogger().println("Bonjour, " + userName + "! " + workflowActionName);
-		else {
-			listener.getLogger().println("Hello, " + userName + "! " + workflowActionName );
-			// TODO build complete logic for updating workflow status and adding comment for each matching issue!
-			
-			// 1. Retrieve issues for updating by JQL
-			SOAPClient soapClient = new SOAPClient();
-			SOAPSession soapSession = soapClient.connect(soapUrl, userName, password);
-			JiraSoapService jiraSoapService = soapSession.getJiraSoapService();
-			String authToken = soapSession.getAuthenticationToken();
-			List<RemoteIssue> issues = soapClient.findIssuesByJQL(jiraSoapService, authToken, jql);
-			for (RemoteIssue issue : issues) {
-				listener.getLogger().println(issue.getKey() + "  \t" + issue.getSummary());
-			}			
-
-			// 2. update issue status
-			// soapClient.updateIssueWorkflowStatus(jiraSoapService, authToken,
-			// "PROJ-1748", WORKFLOW_ACTION_NAME);
-
-			// 3. add issue comment
-			// soapClient.addIssueComment(jiraSoapService, authToken, "PROJ-1748",
-			// COMMENT_TEXT);
-
-			// 4. get list of existing issue fields
-			 List<RemoteField> fields = soapClient.getIssueFields(jiraSoapService,
-			 authToken, "PROJ-1748");
-			 for (RemoteField field : fields) {
-				listener.getLogger().println("issue field id: " + field.getId());
-			 }
-
-			// 5. update some issue fields
-			// Map<String, String []> issueFields = new HashMap<String, String[]>();
-			// issueFields.put("environment", new String [] {"TEST"});
-			// soapClient.updateIssueFields(jiraSoapService, authToken, "PROJ-1748",
-			// issueFields);
+	public boolean perform(AbstractBuild<?, ?> build, Launcher launcher, BuildListener listener) {
+		SOAPClient soapClient = new SOAPClient();
+		SOAPSession soapSession = soapClient.connect(soapUrl, userName, password);
+		JiraSoapService jiraSoapService = soapSession.getJiraSoapService();
+		String authToken = soapSession.getAuthenticationToken();
+		List<RemoteIssue> issues = soapClient.findIssuesByJQL(jiraSoapService, authToken, jql);
+		listener.getLogger().println("Issues selected for update: ");
+		for (RemoteIssue issue : issues) {
+			listener.getLogger().println(issue.getKey() + "  \t" + issue.getSummary());
+			if (!workflowActionName.trim().isEmpty()) {
+				soapClient.updateIssueWorkflowStatus(jiraSoapService, authToken, issue.getKey(), workflowActionName);
+			}
+			if (!comment.trim().isEmpty()) {
+				soapClient.addIssueComment(jiraSoapService, authToken, issue.getKey(), comment);
+			}
 		}
 		return true;
 	}
 
-	// Overridden for better type safety.
-	// If your plugin doesn't really define any property on Descriptor,
-	// you don't have to do this.
 	@Override
 	public DescriptorImpl getDescriptor() {
 		return (DescriptorImpl) super.getDescriptor();
@@ -159,17 +139,6 @@ public class JiraIssueUpdater extends Builder {
 	// This indicates to Jenkins that this is an implementation of an extension
 	// point.
 	public static final class DescriptorImpl extends BuildStepDescriptor<Builder> {
-		/**
-		 * To persist global configuration information, simply store it in a
-		 * field and call save().
-		 * 
-		 * <p>
-		 * If you don't want fields to be persisted, use <tt>transient</tt>.
-		 */
-		private boolean useFrench;
-		
-		
-		// TODO add validation for each field!
 
 		/**
 		 * Performs on-the-fly validation of the form field 'soapUrl'.
@@ -180,13 +149,12 @@ public class JiraIssueUpdater extends Builder {
 		 *         browser.
 		 */
 		public FormValidation doCheckSoapUrl(@QueryParameter String value) throws IOException, ServletException {
-			if (value.length() == 0)
-				return FormValidation.error("Please set the Jira soap url");
-			if (value.length() < 10)
-				return FormValidation.warning("Isn't the url too short?");
+			if (!value.startsWith("http://") && !value.startsWith("https://")) {
+				return FormValidation.error("The Jira URL is mandatory amd must start with http:// or https://");
+			}
 			return FormValidation.ok();
 		}
-		
+
 		/**
 		 * Performs on-the-fly validation of the form field 'userName'.
 		 * 
@@ -196,10 +164,53 @@ public class JiraIssueUpdater extends Builder {
 		 *         browser.
 		 */
 		public FormValidation doCheckUserName(@QueryParameter String value) throws IOException, ServletException {
-			if (value.length() == 0)
+			if (value.length() == 0) {
 				return FormValidation.error("Please set the Jira user name to be used.");
-			if (value.length() < 4)
+			}
+			if (value.length() < 3) {
 				return FormValidation.warning("Isn't the user name too short?");
+			}
+			return FormValidation.ok();
+		}
+
+		/**
+		 * Performs on-the-fly validation of the form field 'password'.
+		 * 
+		 * @param value
+		 *            This parameter receives the value that the user has typed.
+		 * @return Indicates the outcome of the validation. This is sent to the
+		 *         browser.
+		 */
+		public FormValidation doCheckPassword(@QueryParameter String value) throws IOException, ServletException {
+			if (value.length() == 0) {
+				return FormValidation.error("Please set the Jira user password to be used.");
+			}
+			if (value.length() < 3) {
+				return FormValidation.warning("Isn't the password too short?");
+			}
+			return FormValidation.ok();
+		}
+
+		/**
+		 * Performs on-the-fly validation of the form field 'Jql'.
+		 * 
+		 * @param value
+		 *            This parameter receives the value that the user has typed.
+		 * @return Indicates the outcome of the validation. This is sent to the
+		 *         browser.
+		 */
+		public FormValidation doCheckJql(@QueryParameter String value) throws IOException, ServletException {
+			if (value.length() == 0) {
+				return FormValidation.error("Please set the JQL used to select the issues to update.");
+			}
+			if (!value.toLowerCase().contains("project=")) {
+				return FormValidation
+						.warning("Is a project mentioned in the JQL? Using \"project=\" is recommended to select a the issues from a given project.");
+			}
+			if (!value.toLowerCase().contains("status=")) {
+				return FormValidation
+						.warning("Is an issue status mentioned in the JQL? Using \"status=\" is recommended to select the issues by status.");
+			}
 			return FormValidation.ok();
 		}
 
@@ -214,26 +225,6 @@ public class JiraIssueUpdater extends Builder {
 		 */
 		public String getDisplayName() {
 			return "Jira Issue Updater";
-		}
-
-		@Override
-		public boolean configure(StaplerRequest req, JSONObject formData) throws FormException {
-			// To persist global configuration information,
-			// set that to properties and call save().
-			useFrench = formData.getBoolean("useFrench");
-			// ^Can also use req.bindJSON(this, formData);
-			// (easier when there are many fields; need set* methods for this,
-			// like setUseFrench)
-			save();
-			return super.configure(req, formData);
-		}
-
-		/**
-		 * This method returns true if the global configuration says we should
-		 * speak French.
-		 */
-		public boolean useFrench() {
-			return useFrench;
 		}
 	}
 }
