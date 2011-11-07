@@ -10,7 +10,7 @@
 	<groupId>info.bluefloyd.jenkins</groupId>
 	<artifactId>jenkins-jira-issue-updater</artifactId>
 	<name>jenkins-jira-issue-updater</name>
-	<version>1.0-SNAPSHOT</version>
+	<version>1.0</version>
 	<packaging>hpi</packaging>
 
 	<dependencies>
