@@ -8,8 +8,8 @@ import hudson.model.AbstractProject;
 import hudson.tasks.BuildStepDescriptor;
 import hudson.tasks.Builder;
 import hudson.util.FormValidation;
-import info.bluefloyd.jira.SOAPClient;
-import info.bluefloyd.jira.SOAPSession;
+import info.bluefloyd.jenkins.SOAPClient;
+import info.bluefloyd.jenkins.SOAPSession;
 
 import java.io.IOException;
 import java.util.List;
