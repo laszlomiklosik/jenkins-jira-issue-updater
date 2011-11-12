@@ -82,7 +82,7 @@
 
 	<scm>
 		<connection>scm:git:git://github.com/laszlomiklosik/jenkins-jira-issue-updater.git</connection>
-		<developerConnection>scm:git:git://git@github.com/laszlomiklosik/jenkins-jira-issue-updater.git</developerConnection>
+		<developerConnection>scm:git:git@github.com:laszlomiklosik/jenkins-jira-issue-updater.git</developerConnection>
 		<url>https://github.com/laszlomiklosik/jenkins-jira-issue-updater</url>
 	</scm>
 
