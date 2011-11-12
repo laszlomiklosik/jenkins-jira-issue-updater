@@ -113,10 +113,17 @@ public class IssueUpdatesBuilder extends Builder {
 			logger.println("You can find details on the exact problem in the Jenkins server logs.");
 			return true;
 		}
+
 		List<RemoteIssue> issues = client.findIssuesByJQL(session, jql);
 		if (issues.isEmpty()) {
 			logger.println("Your JQL, '" + jql + "' did not return any issues. No issues will be updated during this build.");
 		} else {
+			if (workflowActionName.isEmpty()) {
+				logger.println("No workflow action was specified, status will not be updated for issues.");
+			}
+			if (comment.isEmpty()) {
+				logger.println("No comment was specified, no comment will be added to issues.");
+			}
 			logger.println("Issues selected for update: ");
 		}
 
@@ -133,7 +140,8 @@ public class IssueUpdatesBuilder extends Builder {
 		if (!workflowActionName.trim().isEmpty()) {
 			statusChangeSuccessful = client.updateIssueWorkflowStatus(session, issue.getKey(), workflowActionName);
 			if (!statusChangeSuccessful) {
-				logger.println("Could not update status for issue: " + issue.getKey()
+				logger.println("Could not update status for issue: "
+						+ issue.getKey()
 						+ ". The reason is likely that the Jira workflow scheme does not permit it. For details on the exact problem consult the Jenkins server logs.");
 			}
 		}
