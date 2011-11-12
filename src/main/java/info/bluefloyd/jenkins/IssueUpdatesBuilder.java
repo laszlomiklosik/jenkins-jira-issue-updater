@@ -119,12 +119,13 @@ public class IssueUpdatesBuilder extends Builder {
 			logger.println("Your JQL, '" + jql + "' did not return any issues. No issues will be updated during this build.");
 		} else {
 			if (workflowActionName.isEmpty()) {
-				logger.println("No workflow action was specified, status will not be updated for issues.");
+				logger.println("No workflow action was specified, thus no status update will be made for any of the matching issues.");
 			}
 			if (comment.isEmpty()) {
-				logger.println("No comment was specified, no comment will be added to issues.");
+				logger.println("No comment was specified, thus no comment will be added to any of the matching issues.");
 			}
-			logger.println("Issues selected for update: ");
+			logger.println("Using JQL: " + jql);
+			logger.println("The selected issues (" + issues.size() + " in total) are:");
 		}
 
 		for (RemoteIssue issue : issues) {
