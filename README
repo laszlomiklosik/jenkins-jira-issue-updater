@@ -7,7 +7,7 @@ Possible scenarios in which you might want to use it:
 
 Inputs:
 - the Jira SOAP URL (e.g. http://something.com/rpc/soap/jirasoapservice-v2)
-- the Jira username and password to be used to connect to Jira (e.g. project="JENKINS" and status="Resolved")
-- a JQL query selecting the issues to be updated
+- the Jira username and password to be used to connect to Jira
+- a JQL query selecting the issues to be updated (e.g. project="JENKINS" and status="Pending deploy")
 - the name of the workflow action to be executed (not mandatory)
 - the message to be added to each issue (not mandatory)
