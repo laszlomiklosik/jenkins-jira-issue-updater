@@ -28,19 +28,26 @@ public class SOAPClient {
 	private static final int MAX_NUMBER_OF_ISSUES_RETURNED = 10000;
 
 	public SOAPSession connect(String jiraSoapWsUrl, String userName, String password) {
-		SOAPSession soapSession;
+		SOAPSession soapSession = null;
 		try {
 			soapSession = new SOAPSession(new URL(jiraSoapWsUrl));
 		} catch (MalformedURLException e1) {
-			throw new JiraRemoteException("Invalid URL: " + jiraSoapWsUrl);
+			LOGGER.error("Invalid URL: " + jiraSoapWsUrl);
 		}
-		try {
-			soapSession.connect(userName, password);
-		} catch (RemoteAuthenticationException e) {
-			LOGGER.info("Authentication to Jira failed!");
-			throw new JiraRemoteException("Jira username or password is incorrect!");
-		} catch (RemoteException e) {
-			throw new JiraRemoteException("Could not connect to Jira via SOAP.");
+		return authenticateSoapSession(soapSession, userName, password);
+	}
+
+	private SOAPSession authenticateSoapSession(SOAPSession soapSession, String userName, String password) {
+		if (soapSession != null) {
+			try {
+				soapSession.connect(userName, password);
+			} catch (RemoteAuthenticationException e) {
+				LOGGER.error("Authentication to Jira failed: the Jira username and/or password is incorrect!", e);
+				return null;
+			} catch (RemoteException e) {
+				LOGGER.error("Could not connect to Jira via SOAP.", e);
+				return null;
+			}
 		}
 		return soapSession;
 	}
@@ -78,10 +85,12 @@ public class SOAPClient {
 			LOGGER.error("Error getting issue workflow actions", e);
 		}
 		boolean statusUpdated = false;
+		boolean workflowActionExists = false;
 		if (actions != null) {
 			for (RemoteNamedObject action : actions) {
 				LOGGER.info(action.getName() + "\t id " + action.getId());
 				if (action.getName().equalsIgnoreCase(workflowActionName)) {
+					workflowActionExists = true;
 					try {
 						jiraSoapService.progressWorkflowAction(token, issueKey, action.getId(), null);
 						statusUpdated = true;
@@ -96,6 +105,9 @@ public class SOAPClient {
 		}
 		if (!statusUpdated) {
 			LOGGER.error("Could not update status for issue: " + issueKey);
+		}
+		if (!workflowActionExists) {
+			LOGGER.error("Executing workflow action '" + workflowActionName + "' is not allowed for issue: " + issueKey);
 		}
 
 		return statusUpdated;

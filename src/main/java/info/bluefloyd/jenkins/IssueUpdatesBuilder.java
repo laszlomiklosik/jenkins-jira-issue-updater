@@ -102,10 +102,18 @@ public class IssueUpdatesBuilder extends Builder {
 
 	@Override
 	public boolean perform(AbstractBuild<?, ?> build, Launcher launcher, BuildListener listener) {
+		PrintStream logger = listener.getLogger();
 		SOAPClient client = new SOAPClient();
 		SOAPSession session = client.connect(soapUrl, userName, password);
+		if (session == null) {
+			logger.println("Could not connect to Jira. The cause is one of the following: ");
+			logger.println("- cannot reach Jira via the configured SOAP URL: " + soapUrl
+					+ ". Make sure Jira is started, reachable from this machine, has SOAP enabled and the given SOAP url is correct.");
+			logger.println("- the given Jira credentials are incorrect.");
+			logger.println("You can find details on the exact problem in the Jenkins server logs.");
+			return true;
+		}
 		List<RemoteIssue> issues = client.findIssuesByJQL(session, jql);
-		PrintStream logger = listener.getLogger();
 		if (issues.isEmpty()) {
 			logger.println("Your JQL, '" + jql + "' did not return any issues. No issues will be updated during this build.");
 		} else {
@@ -125,7 +133,8 @@ public class IssueUpdatesBuilder extends Builder {
 		if (!workflowActionName.trim().isEmpty()) {
 			statusChangeSuccessful = client.updateIssueWorkflowStatus(session, issue.getKey(), workflowActionName);
 			if (!statusChangeSuccessful) {
-				logger.println("Could not update issue: " + issue.getKey() + ". Either the Jira workflow scheme does not permit it or an error occured!");
+				logger.println("Could not update status for issue: " + issue.getKey()
+						+ ". The reason is likely that the Jira workflow scheme does not permit it. For details on the exact problem consult the Jenkins server logs.");
 			}
 		}
 	}
