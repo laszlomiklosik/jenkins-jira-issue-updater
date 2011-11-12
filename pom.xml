@@ -7,7 +7,7 @@
 	<packaging>hpi</packaging>
 	<name>Jenkins Jira Issue Updater</name>
 	<description>Jenkins plugin which can update Jira issues in a maven or a freestyle job.</description>
-
+	<url>http://wiki.jenkins-ci.org/display/JENKINS/jenkins-jira-issue-updater</url>
 
 	<parent>
 		<groupId>org.jenkins-ci.plugins</groupId>
@@ -79,4 +79,10 @@
 			</plugin>
 		</plugins>
 	</build>
+
+	<scm>
+		<connection>scm:git:ssh://github.com/laszlomiklosik/jenkins-jira-issue-updater.git</connection>
+		<developerConnection>scm:git:ssh://git@github.com/laszlomiklosik/jenkins-jira-issue-updater.git</developerConnection>
+		<url>https://github.com/laszlomiklosik/jenkins-jira-issue-updater</url>
+	</scm>
 </project>
