@@ -81,10 +81,10 @@
 	</build>
 
 	<scm>
-		<connection>scm:git:git://github.com/laszlomiklosik/jenkins-jira-issue-updater.git</connection>
-		<developerConnection>scm:git:git@github.com:laszlomiklosik/jenkins-jira-issue-updater.git</developerConnection>
-		<url>https://github.com/laszlomiklosik/jenkins-jira-issue-updater</url>
-	</scm>
+    		<connection>scm:git:ssh://github.com/jenkinsci/jira-issue-updater-plugin.git</connection>
+    		<developerConnection>scm:git:ssh://git@github.com/jenkinsci/jira-issue-updater-plugin.git</developerConnection>
+    		<url>https://github.com/jenkinsci/jira-issue-updater-plugin</url>
+  	</scm>
 
 	<developers>
 		<developer>
