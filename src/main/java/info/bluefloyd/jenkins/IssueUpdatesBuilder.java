@@ -8,10 +8,9 @@ import hudson.model.AbstractProject;
 import hudson.tasks.BuildStepDescriptor;
 import hudson.tasks.Builder;
 import hudson.util.FormValidation;
-import info.bluefloyd.jenkins.SOAPClient;
-import info.bluefloyd.jenkins.SOAPSession;
 
 import java.io.IOException;
+import java.io.PrintStream;
 import java.util.List;
 
 import javax.servlet.ServletException;
@@ -20,15 +19,14 @@ import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.StaplerRequest;
 
-import com.atlassian.jira.rpc.soap.client.JiraSoapService;
 import com.atlassian.jira.rpc.soap.client.RemoteIssue;
 
 /**
  * <p>
  * When the user configures the project and enables this builder,
  * {@link DescriptorImpl#newInstance(StaplerRequest)} is invoked and a new
- * {@link JiraIssueUpdater} is created. The created instance is persisted to the
- * project configuration XML by using XStream, so this allows you to use
+ * {@link IssueUpdatesBuilder} is created. The created instance is persisted to
+ * the project configuration XML by using XStream, so this allows you to use
  * instance fields (like {@link #name}) to remember the configuration.
  * 
  * <p>
@@ -38,7 +36,10 @@ import com.atlassian.jira.rpc.soap.client.RemoteIssue;
  * 
  * @author Laszlo Miklosik
  */
-public class JiraIssueUpdater extends Builder {
+public class IssueUpdatesBuilder extends Builder {
+
+	private static final String HTTP_PROTOCOL_PREFIX = "http://";
+	private static final String HTTPS_PROTOCOL_PREFIX = "https://";
 
 	private final String soapUrl;
 	private final String userName;
@@ -47,10 +48,8 @@ public class JiraIssueUpdater extends Builder {
 	private final String workflowActionName;
 	private final String comment;
 
-	// Fields in config.jelly must match the parameter names in the
-	// "DataBoundConstructor"
 	@DataBoundConstructor
-	public JiraIssueUpdater(String soapUrl, String userName, String password, String jql, String workflowActionName, String comment) {
+	public IssueUpdatesBuilder(String soapUrl, String userName, String password, String jql, String workflowActionName, String comment) {
 		this.soapUrl = soapUrl;
 		this.userName = userName;
 		this.password = password;
@@ -103,22 +102,42 @@ public class JiraIssueUpdater extends Builder {
 
 	@Override
 	public boolean perform(AbstractBuild<?, ?> build, Launcher launcher, BuildListener listener) {
-		SOAPClient soapClient = new SOAPClient();
-		SOAPSession soapSession = soapClient.connect(soapUrl, userName, password);
-		JiraSoapService jiraSoapService = soapSession.getJiraSoapService();
-		String authToken = soapSession.getAuthenticationToken();
-		List<RemoteIssue> issues = soapClient.findIssuesByJQL(jiraSoapService, authToken, jql);
-		listener.getLogger().println("Issues selected for update: ");
+		SOAPClient client = new SOAPClient();
+		SOAPSession session = client.connect(soapUrl, userName, password);
+		List<RemoteIssue> issues = client.findIssuesByJQL(session, jql);
+		PrintStream logger = listener.getLogger();
+		if (issues.isEmpty()) {
+			logger.println("Your JQL, '" + jql + "' did not return any issues. No issues will be updated during this build.");
+		} else {
+			logger.println("Issues selected for update: ");
+		}
+
 		for (RemoteIssue issue : issues) {
 			listener.getLogger().println(issue.getKey() + "  \t" + issue.getSummary());
-			if (!workflowActionName.trim().isEmpty()) {
-				soapClient.updateIssueWorkflowStatus(jiraSoapService, authToken, issue.getKey(), workflowActionName);
-			}
-			if (!comment.trim().isEmpty()) {
-				soapClient.addIssueComment(jiraSoapService, authToken, issue.getKey(), comment);
-			}
+			updateIssueStatus(client, session, issue, logger);
+			addIssueComment(client, session, issue, logger);
 		}
 		return true;
+	}
+
+	private void updateIssueStatus(SOAPClient client, SOAPSession session, RemoteIssue issue, PrintStream logger) {
+		boolean statusChangeSuccessful = false;
+		if (!workflowActionName.trim().isEmpty()) {
+			statusChangeSuccessful = client.updateIssueWorkflowStatus(session, issue.getKey(), workflowActionName);
+			if (!statusChangeSuccessful) {
+				logger.println("Could not update issue: " + issue.getKey() + ". Either the Jira workflow scheme does not permit it or an error occured!");
+			}
+		}
+	}
+
+	private void addIssueComment(SOAPClient client, SOAPSession session, RemoteIssue issue, PrintStream logger) {
+		boolean addMessageSuccessful = false;
+		if (!comment.trim().isEmpty()) {
+			addMessageSuccessful = client.addIssueComment(session, issue.getKey(), comment);
+			if (!addMessageSuccessful) {
+				logger.println("Could not add message to issue " + issue.getKey());
+			}
+		}
 	}
 
 	@Override
@@ -127,17 +146,14 @@ public class JiraIssueUpdater extends Builder {
 	}
 
 	/**
-	 * Descriptor for {@link JiraIssueUpdater}. Used as a singleton. The class
-	 * is marked as public so that it can be accessed from views.
+	 * Descriptor for {@link IssueUpdatesBuilder}. Used as a singleton. The
+	 * class is marked as public so that it can be accessed from views.
 	 * 
 	 * <p>
-	 * See
-	 * <tt>src/main/resources/hudson/plugins/hello_world/JiraIssueUpdater/*.jelly</tt>
+	 * See <tt>src/main/resources/jenkins/JiraIssueUpdatesBuilder/*.jelly</tt>
 	 * for the actual HTML fragment for the configuration screen.
 	 */
 	@Extension
-	// This indicates to Jenkins that this is an implementation of an extension
-	// point.
 	public static final class DescriptorImpl extends BuildStepDescriptor<Builder> {
 
 		/**
@@ -149,7 +165,7 @@ public class JiraIssueUpdater extends Builder {
 		 *         browser.
 		 */
 		public FormValidation doCheckSoapUrl(@QueryParameter String value) throws IOException, ServletException {
-			if (!value.startsWith("http://") && !value.startsWith("https://")) {
+			if (!value.startsWith(HTTP_PROTOCOL_PREFIX) && !value.startsWith(HTTPS_PROTOCOL_PREFIX)) {
 				return FormValidation.error("The Jira URL is mandatory amd must start with http:// or https://");
 			}
 			return FormValidation.ok();
@@ -188,6 +204,7 @@ public class JiraIssueUpdater extends Builder {
 			if (value.length() < 3) {
 				return FormValidation.warning("Isn't the password too short?");
 			}
+
 			return FormValidation.ok();
 		}
 
@@ -215,8 +232,7 @@ public class JiraIssueUpdater extends Builder {
 		}
 
 		public boolean isApplicable(Class<? extends AbstractProject> aClass) {
-			// Indicates that this builder can be used with all kinds of project
-			// types
+			// This builder can be used with all kinds of project types
 			return true;
 		}
 

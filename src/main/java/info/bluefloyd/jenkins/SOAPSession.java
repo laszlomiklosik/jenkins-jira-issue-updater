@@ -13,8 +13,9 @@ import com.atlassian.jira.rpc.soap.client.JiraSoapServiceService;
 import com.atlassian.jira.rpc.soap.client.JiraSoapServiceServiceLocator;
 
 /**
- * This represents a SOAP session with JIRA including that state of being logged
- * in or not
+ * This represents a SOAP session with JIRA.
+ * 
+ * @author Laszlo Miklosik
  */
 public class SOAPSession {
 	private static final Log LOGGER = LogFactory.getLog(SOAPSession.class);
