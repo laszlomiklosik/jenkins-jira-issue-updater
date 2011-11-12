@@ -1,11 +1,13 @@
 This is a Jenkins plugin which updates issues in Jira (by changing their status and adding a comment) as part of a Jenkins job.
 
 Possible scenarios in which you might want to use it:
+
 - in case you would like to announce or just log in Jira that the deployment of certain fixes / issues the acceptance server has completed (this makes sense if you already use Jenkins to deploy your applications to the acceptance web/app server).
 - in case you would like Jenkins to update multiple issues when a new version of one of your projects is released (this makes sense if you use the "maven release plugin" and you trigger it from Jenkins).
 - in case you would like to progress multiple Jira issues in the workflow (bulk changing the status of multiple Jira issues) and/or add a comment to issues after a Jenkins job has successfully completed.
 
 Inputs:
+
 - the Jira SOAP URL (e.g. http://something.com/rpc/soap/jirasoapservice-v2)
 - the Jira username and password to be used to connect to Jira
 - a JQL query selecting the issues to be updated (e.g. project="JENKINS" and status="Pending deploy")
