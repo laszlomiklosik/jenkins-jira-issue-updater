@@ -5,13 +5,16 @@ import hudson.Launcher;
 import hudson.model.BuildListener;
 import hudson.model.AbstractBuild;
 import hudson.model.AbstractProject;
+import hudson.model.BuildVariableContributor;
 import hudson.tasks.BuildStepDescriptor;
 import hudson.tasks.Builder;
 import hudson.util.FormValidation;
 
 import java.io.IOException;
 import java.io.PrintStream;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import javax.servlet.ServletException;
 
@@ -38,6 +41,7 @@ import com.atlassian.jira.rpc.soap.client.RemoteIssue;
  */
 public class IssueUpdatesBuilder extends Builder {
 
+	private static final String BUILD_PARAMETER_PREFIX = "$";
 	private static final String HTTP_PROTOCOL_PREFIX = "http://";
 	private static final String HTTPS_PROTOCOL_PREFIX = "https://";
 
@@ -47,6 +51,12 @@ public class IssueUpdatesBuilder extends Builder {
 	private final String jql;
 	private final String workflowActionName;
 	private final String comment;
+	private String realJql;
+	private String realWorkflowActionName;
+	private String realComment;
+	
+	
+	
 
 	@DataBoundConstructor
 	public IssueUpdatesBuilder(String soapUrl, String userName, String password, String jql, String workflowActionName, String comment) {
@@ -99,10 +109,34 @@ public class IssueUpdatesBuilder extends Builder {
 	public String getComment() {
 		return comment;
 	}
-
+	
 	@Override
-	public boolean perform(AbstractBuild<?, ?> build, Launcher launcher, BuildListener listener) {
-		PrintStream logger = listener.getLogger();
+	public boolean perform(AbstractBuild<?, ?> build, Launcher launcher, BuildListener listener) throws IOException, InterruptedException {
+		PrintStream logger = listener.getLogger();       
+		
+		Map<String, String> vars = new HashMap<String, String>(); 
+		vars.putAll(build.getEnvironment(listener));
+		vars.putAll(build.getBuildVariables());
+	
+		// build parameter substitution
+		if (jql.startsWith(BUILD_PARAMETER_PREFIX)) {
+			realJql = vars.get(jql.substring(1));
+		} else {
+			realJql = jql;
+		}
+		
+		if (workflowActionName.startsWith(BUILD_PARAMETER_PREFIX)) {
+			realWorkflowActionName = vars.get(workflowActionName.substring(1));
+		} else {
+			realWorkflowActionName = workflowActionName;
+		}
+		
+		if (comment.startsWith(BUILD_PARAMETER_PREFIX)) {
+			realComment = vars.get(comment.substring(1));
+		} else {
+			realComment = comment;
+		}        
+        
 		SOAPClient client = new SOAPClient();
 		SOAPSession session = client.connect(soapUrl, userName, password);
 		if (session == null) {
@@ -114,17 +148,17 @@ public class IssueUpdatesBuilder extends Builder {
 			return true;
 		}
 
-		List<RemoteIssue> issues = client.findIssuesByJQL(session, jql);
+		List<RemoteIssue> issues = client.findIssuesByJQL(session, realJql);
 		if (issues.isEmpty()) {
-			logger.println("Your JQL, '" + jql + "' did not return any issues. No issues will be updated during this build.");
+			logger.println("Your JQL, '" + realJql + "' did not return any issues. No issues will be updated during this build.");
 		} else {
-			if (workflowActionName.isEmpty()) {
+			if (realWorkflowActionName.isEmpty()) {
 				logger.println("No workflow action was specified, thus no status update will be made for any of the matching issues.");
 			}
-			if (comment.isEmpty()) {
+			if (realComment.isEmpty()) {
 				logger.println("No comment was specified, thus no comment will be added to any of the matching issues.");
 			}
-			logger.println("Using JQL: " + jql);
+			logger.println("Using JQL: " + realJql);
 			logger.println("The selected issues (" + issues.size() + " in total) are:");
 		}
 
@@ -138,8 +172,8 @@ public class IssueUpdatesBuilder extends Builder {
 
 	private void updateIssueStatus(SOAPClient client, SOAPSession session, RemoteIssue issue, PrintStream logger) {
 		boolean statusChangeSuccessful = false;
-		if (!workflowActionName.trim().isEmpty()) {
-			statusChangeSuccessful = client.updateIssueWorkflowStatus(session, issue.getKey(), workflowActionName);
+		if (!realWorkflowActionName.trim().isEmpty()) {
+			statusChangeSuccessful = client.updateIssueWorkflowStatus(session, issue.getKey(), realWorkflowActionName);
 			if (!statusChangeSuccessful) {
 				logger.println("Could not update status for issue: "
 						+ issue.getKey()
@@ -150,8 +184,8 @@ public class IssueUpdatesBuilder extends Builder {
 
 	private void addIssueComment(SOAPClient client, SOAPSession session, RemoteIssue issue, PrintStream logger) {
 		boolean addMessageSuccessful = false;
-		if (!comment.trim().isEmpty()) {
-			addMessageSuccessful = client.addIssueComment(session, issue.getKey(), comment);
+		if (!realComment.trim().isEmpty()) {
+			addMessageSuccessful = client.addIssueComment(session, issue.getKey(), realComment);
 			if (!addMessageSuccessful) {
 				logger.println("Could not add message to issue " + issue.getKey());
 			}
