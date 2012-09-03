@@ -2,7 +2,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>info.bluefloyd.jenkins</groupId>
 	<artifactId>jenkins-jira-issue-updater</artifactId>
-	<version>1.2</version>
+	<version>1.2-SNAPSHOT</version>
 	<packaging>hpi</packaging>
 	<name>Jenkins Jira Issue Updater</name>
 	<description>Jenkins plugin which can update Jira issues in a maven or a freestyle job.</description>
@@ -80,8 +80,8 @@
 	</build>
 
 	<scm>
-    		<connection>scm:git:https://github.com/jenkinsci/jira-issue-updater-plugin.git</connection>
-    		<developerConnection>scm:git:https://github.com/jenkinsci/jira-issue-updater-plugin.git</developerConnection>
+		<connection>scm:git:ssh://github.com/jenkinsci/jira-issue-updater-plugin.git</connection>  	
+		<developerConnection>scm:git:ssh://git@github.com/jenkinsci/jira-issue-updater-plugin.git</developerConnection
     		<url>https://github.com/jenkinsci/jira-issue-updater-plugin</url>
   	</scm>
 
