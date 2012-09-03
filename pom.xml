@@ -81,7 +81,7 @@
 
 	<scm>
 		<connection>scm:git:ssh://github.com/jenkinsci/jira-issue-updater-plugin.git</connection>  	
-		<developerConnection>scm:git:ssh://git@github.com/jenkinsci/jira-issue-updater-plugin.git</developerConnection
+		<developerConnection>scm:git:ssh://git@github.com/jenkinsci/jira-issue-updater-plugin.git</developerConnection>
     		<url>https://github.com/jenkinsci/jira-issue-updater-plugin</url>
   	</scm>
 
