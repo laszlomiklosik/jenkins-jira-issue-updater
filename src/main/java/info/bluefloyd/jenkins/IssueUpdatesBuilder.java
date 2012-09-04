@@ -117,25 +117,23 @@ public class IssueUpdatesBuilder extends Builder {
 		Map<String, String> vars = new HashMap<String, String>(); 
 		vars.putAll(build.getEnvironment(listener));
 		vars.putAll(build.getBuildVariables());
-	
+		
+		realJql = jql;
+		realWorkflowActionName = workflowActionName;
+		realComment = comment;
+		
 		// build parameter substitution
-		if (jql.startsWith(BUILD_PARAMETER_PREFIX)) {
-			realJql = vars.get(jql.substring(1));
-		} else {
-			realJql = jql;
-		}
-		
-		if (workflowActionName.startsWith(BUILD_PARAMETER_PREFIX)) {
-			realWorkflowActionName = vars.get(workflowActionName.substring(1));
-		} else {
-			realWorkflowActionName = workflowActionName;
-		}
-		
-		if (comment.startsWith(BUILD_PARAMETER_PREFIX)) {
-			realComment = vars.get(comment.substring(1));
-		} else {
-			realComment = comment;
-		}        
+		for (String key : vars.keySet()) {			
+			if (jql.contains(BUILD_PARAMETER_PREFIX + key)) {
+				realJql = realJql.replace(BUILD_PARAMETER_PREFIX + key, vars.get(key));
+			}
+			if (workflowActionName.contains(BUILD_PARAMETER_PREFIX + key)) {
+				realWorkflowActionName = realWorkflowActionName.replace(BUILD_PARAMETER_PREFIX + key, vars.get(key));
+			}
+			if (realComment.contains(BUILD_PARAMETER_PREFIX + key)) {
+				realComment = realComment.replace(BUILD_PARAMETER_PREFIX + key, vars.get(key));
+			}			
+		}       
         
 		SOAPClient client = new SOAPClient();
 		SOAPSession session = client.connect(soapUrl, userName, password);
