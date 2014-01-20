@@ -29,4 +29,12 @@
     <f:textbox />
   </f:entry>
   
+  <f:entry title="Remove existing fixed versions first" field="resettingFixedVersions">
+    <f:checkbox />
+  </f:entry>
+  
+  <f:entry title="Fixed versions to be added (delimited by comma)" field="fixedVersions">
+    <f:textbox />
+  </f:entry>
+  
 </j:jelly>
