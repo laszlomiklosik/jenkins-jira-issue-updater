@@ -245,7 +245,7 @@ public class IssueUpdatesBuilder extends Builder {
 	 * The jira soap api needs <code>ID</code>s of the fixed versions instead the human readable
 	 * <code>name</code>s. The (fixed) versions are project specific.
 	 * Since the issues found by <code>jql</code> do not necessarily belong to the
-	 * same jira project. they must be retrieved for every single issue. 
+	 * same jira project. the versions must be retrieved for every single issue. 
 	 * In some cases, however, the issues do belong to the same project,
 	 * so the Soap call to get versions may well be redundant. Those unnecessary
 	 * soap calls may cause performance problem if number of issues is large. 
