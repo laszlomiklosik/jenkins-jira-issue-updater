@@ -214,18 +214,21 @@ public class IssueUpdatesBuilder extends Builder {
 	}
 
 	private void updateFixedVersions(SOAPClient client, SOAPSession session, RemoteIssue issue, PrintStream logger) {
+		// NOT resettingFixedVersions and EMPTY fixedVersionNames: do not need to update the issue,
+		// otherwise:
 		if ( resettingFixedVersions || ! fixedVersionNames.isEmpty() ) {
-			// merges the ids of the final fixed versions
+			// add the ids of the fixed versions
 			Collection<String> finalVersionIds = new HashSet<String>();
 			if ( ! fixedVersionNames.isEmpty() ) {
 				finalVersionIds.addAll( mapFixedVersionNamesToIds( client, session, issue.getProject(), fixedVersionNames, logger ) );
 			}
-			// if not reset origin fixed versions, then also add their IDs to the set.
+			// if not reset origin fixed versions, then also merge their IDs to the set.
 			if ( ! resettingFixedVersions ) {
 				for( RemoteVersion ver : issue.getFixVersions() ) {
 					finalVersionIds.add( ver.getId() );
 				}
 			}
+			// do the update
 			boolean updateSuccessful = client.updateFixedVersions( session, issue, finalVersionIds );
 			if ( ! updateSuccessful) {
 					logger.println("Could not update fixed versions for issue: "
@@ -237,24 +240,26 @@ public class IssueUpdatesBuilder extends Builder {
 	
 	/**
 	 * Converts version names to IDs for the specified project.
-	 * Non-existent versions are ignored.
+	 * Non-existent versions are ignored, error messages are logged.
 	 * <p>
-	 * The jira soap api needs <code>ID</code> of the fixed versions instead the human readable
-	 * <code>name</code>. Since the (fixed) versions are project specified, they
-	 * must be retrieved from the server, and this must be done for every issue. 
-	 * In most cases the issues belong to the same project, so the Soap call may 
-	 * well be redundant, thus cause performance problem for large number of issues. 
-	 * {@link #projectVersionNameIdCache} is intended to improve the situation,
-	 * but could this cause concurrent issues?
-	 * </p>	 * 
+	 * The jira soap api needs <code>ID</code>s of the fixed versions instead the human readable
+	 * <code>name</code>s. The (fixed) versions are project specific.
+	 * Since the issues found by <code>jql</code> do not necessarily belong to the
+	 * same jira project. they must be retrieved for every single issue. 
+	 * In some cases, however, the issues do belong to the same project,
+	 * so the Soap call to get versions may well be redundant. Those unnecessary
+	 * soap calls may cause performance problem if number of issues is large. 
+	 * {@link #projectVersionNameIdCache} as a primitive cache, is intended to 
+	 * improve the situation (could this cause concurrent issues?).
+	 * </p>	 
 	 * @param session
 	 * @param projectKey	key of the project
-	 * @param versionNames	human readable version names (jira built-in or
-	 * 						configured per project)
-	 * @return	
+	 * @param versionNames	a collection of human readable jira version names
+	 * 			(jira built-in or configured per project)
+	 * @return		corresponding jira version ids 	
 	 */
 	private Collection<String> mapFixedVersionNamesToIds( SOAPClient client, SOAPSession session, String projectKey, Collection<String> versionNames, PrintStream logger ) {
-		// lazy fetching project versions 
+		// lazy fetching project versions and initializing the name-id map for the versions if necessary
 		Map<String, String> map = projectVersionNameIdCache.get( projectKey ); 
 		if ( map == null ) {
 			map = new ConcurrentHashMap<String, String>();
@@ -264,7 +269,7 @@ public class IssueUpdatesBuilder extends Builder {
 				map.put( ver.getName(), ver.getId() );
 			}
 		}
-		
+		// getting the ids corresponding to the names
 		Collection<String> ids = new HashSet<String>();
 		for( String name : versionNames ){
 			if ( name != null )
