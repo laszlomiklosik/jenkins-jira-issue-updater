@@ -5,6 +5,7 @@ import java.net.URL;
 import java.rmi.RemoteException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 
 import org.apache.commons.logging.Log;
@@ -13,9 +14,11 @@ import org.apache.commons.logging.LogFactory;
 import com.atlassian.jira.rpc.soap.client.JiraSoapService;
 import com.atlassian.jira.rpc.soap.client.RemoteAuthenticationException;
 import com.atlassian.jira.rpc.soap.client.RemoteComment;
+import com.atlassian.jira.rpc.soap.client.RemoteFieldValue;
 import com.atlassian.jira.rpc.soap.client.RemoteIssue;
 import com.atlassian.jira.rpc.soap.client.RemoteNamedObject;
 import com.atlassian.jira.rpc.soap.client.RemotePermissionException;
+import com.atlassian.jira.rpc.soap.client.RemoteVersion;
 
 /**
  * Simple client used to make calls to Jira via SOAP.
@@ -133,5 +136,53 @@ public class SOAPClient {
 			LOGGER.error(errorMessage, e);
 		}
 		return commentAdded;
+	}
+	
+	/**
+	 * Returns all versions defined for specified peoject.
+	 * @param session
+	 * @param projectKey	project key
+	 * @return
+	 */
+	public List<RemoteVersion> getVersions( SOAPSession session, String projectKey ) {
+		String token = session.getAuthenticationToken();
+		JiraSoapService soap = session.getJiraSoapService();
+		
+		List<RemoteVersion> versions = new ArrayList<RemoteVersion>();
+		try	{
+			RemoteVersion[] remoteVersions = soap.getVersions( token, projectKey );
+			if ( remoteVersions != null ) {
+				for( RemoteVersion ver : remoteVersions ) {
+					versions.add( ver );
+				}
+			}
+		} catch ( RemoteException e ) {
+			LOGGER.error( "Error getting versions for project " + projectKey, e);
+		}
+		return versions;
+	}
+
+	/**
+	 * Updates fixedVersions of the specified jira issue.
+	 * @param session
+	 * @param issue
+	 * @param finalVersionIds	collection of <b>id</b> of the fixed versions -
+	 * 							numbers in text format (also Strings)
+	 * @return
+	 */
+	public boolean updateFixedVersions( SOAPSession session, final RemoteIssue issue, Collection<String> finalVersionIds )
+	{
+		String token = session.getAuthenticationToken();
+		JiraSoapService soap = session.getJiraSoapService();
+		boolean successful = false;
+		try
+		{	
+			RemoteFieldValue fixedVersionsValue = new RemoteFieldValue( "fixVersions", finalVersionIds.toArray( new String[]{} ) );
+			soap.updateIssue( token, issue.getKey(),  new RemoteFieldValue[] { fixedVersionsValue} );
+			successful = true;
+		} catch (RemoteException e) {
+			LOGGER.error( "Error setting fixed versions to issue: " + issue.getKey(), e);
+		}
+		return successful;
 	}
 }

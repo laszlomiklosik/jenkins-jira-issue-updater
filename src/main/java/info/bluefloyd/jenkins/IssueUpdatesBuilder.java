@@ -5,16 +5,24 @@ import hudson.Launcher;
 import hudson.model.BuildListener;
 import hudson.model.AbstractBuild;
 import hudson.model.AbstractProject;
-import hudson.model.BuildVariableContributor;
 import hudson.tasks.BuildStepDescriptor;
 import hudson.tasks.Builder;
 import hudson.util.FormValidation;
+import info.bluefloyd.jenkins.SOAPClient;
+import info.bluefloyd.jenkins.SOAPSession;
 
 import java.io.IOException;
 import java.io.PrintStream;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.servlet.ServletException;
 
@@ -23,6 +31,7 @@ import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.StaplerRequest;
 
 import com.atlassian.jira.rpc.soap.client.RemoteIssue;
+import com.atlassian.jira.rpc.soap.client.RemoteVersion;
 
 /**
  * <p>
@@ -44,6 +53,8 @@ public class IssueUpdatesBuilder extends Builder {
 	private static final String BUILD_PARAMETER_PREFIX = "$";
 	private static final String HTTP_PROTOCOL_PREFIX = "http://";
 	private static final String HTTPS_PROTOCOL_PREFIX = "https://";
+	// Delimiter separates fixed versions
+	private static final String	DELIMITER	= ",";
 
 	private final String soapUrl;
 	private final String userName;
@@ -55,17 +66,26 @@ public class IssueUpdatesBuilder extends Builder {
 	private String realWorkflowActionName;
 	private String realComment;
 	
+	private boolean resettingFixedVersions;
+	private String fixedVersions;
+	transient List<String> fixedVersionNames;
 	
-	
+	// Temporarily cache the version String-ID mapping for multiple
+	// projects, to avoid performance penalty may be caused by excessive
+	// getVersions() invocations.  
+	// Map<ProjectKey, Map<VersionName, VersionID>>
+	transient Map<String, Map<String, String>> projectVersionNameIdCache;
 
 	@DataBoundConstructor
-	public IssueUpdatesBuilder(String soapUrl, String userName, String password, String jql, String workflowActionName, String comment) {
+	public IssueUpdatesBuilder(String soapUrl, String userName, String password, String jql, String workflowActionName, String comment, boolean resettingFixedVersions, String fixedVersions ) {
 		this.soapUrl = soapUrl;
 		this.userName = userName;
 		this.password = password;
 		this.jql = jql;
 		this.workflowActionName = workflowActionName;
 		this.comment = comment;
+		this.resettingFixedVersions = resettingFixedVersions;
+		this.fixedVersions = fixedVersions;
 	}
 
 	/**
@@ -110,6 +130,16 @@ public class IssueUpdatesBuilder extends Builder {
 		return comment;
 	}
 	
+	public String getFixedVersions()
+	{
+		return fixedVersions;
+	}
+
+	public boolean isResettingFixedVersions()
+	{
+		return resettingFixedVersions;
+	}
+
 	@Override
 	public boolean perform(AbstractBuild<?, ?> build, Launcher launcher, BuildListener listener) throws IOException, InterruptedException {
 		PrintStream logger = listener.getLogger();       
@@ -118,22 +148,7 @@ public class IssueUpdatesBuilder extends Builder {
 		vars.putAll(build.getEnvironment(listener));
 		vars.putAll(build.getBuildVariables());
 		
-		realJql = jql;
-		realWorkflowActionName = workflowActionName;
-		realComment = comment;
-		
-		// build parameter substitution
-		for (String key : vars.keySet()) {			
-			if (jql.contains(BUILD_PARAMETER_PREFIX + key)) {
-				realJql = realJql.replace(BUILD_PARAMETER_PREFIX + key, vars.get(key));
-			}
-			if (workflowActionName.contains(BUILD_PARAMETER_PREFIX + key)) {
-				realWorkflowActionName = realWorkflowActionName.replace(BUILD_PARAMETER_PREFIX + key, vars.get(key));
-			}
-			if (realComment.contains(BUILD_PARAMETER_PREFIX + key)) {
-				realComment = realComment.replace(BUILD_PARAMETER_PREFIX + key, vars.get(key));
-			}			
-		}       
+		substituteEnvVars( vars );
         
 		SOAPClient client = new SOAPClient();
 		SOAPSession session = client.connect(soapUrl, userName, password);
@@ -160,12 +175,114 @@ public class IssueUpdatesBuilder extends Builder {
 			logger.println("The selected issues (" + issues.size() + " in total) are:");
 		}
 
+		// reset the cache
+		projectVersionNameIdCache = new ConcurrentHashMap<String, Map<String,String>>();
+		
 		for (RemoteIssue issue : issues) {
 			listener.getLogger().println(issue.getKey() + "  \t" + issue.getSummary());
 			updateIssueStatus(client, session, issue, logger);
 			addIssueComment(client, session, issue, logger);
+			updateFixedVersions(client, session, issue, logger);
 		}
 		return true;
+	}
+
+	void substituteEnvVars( Map<String, String> vars )
+	{
+		realJql = jql;
+		realWorkflowActionName = workflowActionName;
+		realComment = comment;
+		String expandedFixedVersions = fixedVersions == null ? "" : fixedVersions.trim();
+		
+		// build parameter substitution
+		for ( Entry<String, String> entry : vars.entrySet() ) {		
+			realJql = substituteEnvVar( realJql, entry.getKey(), entry.getValue() );
+			realWorkflowActionName = substituteEnvVar( realWorkflowActionName, entry.getKey(), entry.getValue() );
+			realComment = substituteEnvVar( realComment, entry.getKey(), entry.getValue() );
+			expandedFixedVersions = substituteEnvVar( expandedFixedVersions, entry.getKey(), entry.getValue() );
+		}
+		// NOTE: did not trim
+		fixedVersionNames = Arrays.asList( expandedFixedVersions.trim().split( DELIMITER ) );
+	}
+	
+	String substituteEnvVar( String origin, String varName, String replacement ) {
+		String key = BUILD_PARAMETER_PREFIX + varName;
+		if( origin != null && origin.contains( key ) ) {
+			return origin.replaceAll( Pattern.quote( key ), Matcher.quoteReplacement(replacement) );
+		}
+		return origin;
+	}
+
+	private void updateFixedVersions(SOAPClient client, SOAPSession session, RemoteIssue issue, PrintStream logger) {
+		// NOT resettingFixedVersions and EMPTY fixedVersionNames: do not need to update the issue,
+		// otherwise:
+		if ( resettingFixedVersions || ! fixedVersionNames.isEmpty() ) {
+			// add the ids of the fixed versions
+			Collection<String> finalVersionIds = new HashSet<String>();
+			if ( ! fixedVersionNames.isEmpty() ) {
+				finalVersionIds.addAll( mapFixedVersionNamesToIds( client, session, issue.getProject(), fixedVersionNames, logger ) );
+			}
+			// if not reset origin fixed versions, then also merge their IDs to the set.
+			if ( ! resettingFixedVersions ) {
+				for( RemoteVersion ver : issue.getFixVersions() ) {
+					finalVersionIds.add( ver.getId() );
+				}
+			}
+			// do the update
+			boolean updateSuccessful = client.updateFixedVersions( session, issue, finalVersionIds );
+			if ( ! updateSuccessful) {
+					logger.println("Could not update fixed versions for issue: "
+							+ issue.getKey() + " to " + finalVersionIds
+							+ ". For details on the exact problem consult the Jenkins server logs.");
+			}
+		}
+	}
+	
+	/**
+	 * Converts version names to IDs for the specified project.
+	 * Non-existent versions are ignored, error messages are logged.
+	 * <p>
+	 * The jira soap api needs <code>ID</code>s of the fixed versions instead the human readable
+	 * <code>name</code>s. The (fixed) versions are project specific.
+	 * Since the issues found by <code>jql</code> do not necessarily belong to the
+	 * same jira project. the versions must be retrieved for every single issue. 
+	 * In some cases, however, the issues do belong to the same project,
+	 * so the Soap call to get versions may well be redundant. Those unnecessary
+	 * soap calls may cause performance problem if number of issues is large. 
+	 * {@link #projectVersionNameIdCache} as a primitive cache, is intended to 
+	 * improve the situation (could this cause concurrent issues?).
+	 * </p>	 
+	 * @param session
+	 * @param projectKey	key of the project
+	 * @param versionNames	a collection of human readable jira version names
+	 * 			(jira built-in or configured per project)
+	 * @return		corresponding jira version ids 	
+	 */
+	private Collection<String> mapFixedVersionNamesToIds( SOAPClient client, SOAPSession session, String projectKey, Collection<String> versionNames, PrintStream logger ) {
+		// lazy fetching project versions and initializing the name-id map for the versions if necessary
+		Map<String, String> map = projectVersionNameIdCache.get( projectKey ); 
+		if ( map == null ) {
+			map = new ConcurrentHashMap<String, String>();
+			projectVersionNameIdCache.put( projectKey, map );
+			List<RemoteVersion> versions = client.getVersions( session, projectKey );
+			for ( RemoteVersion ver : versions ) {
+				map.put( ver.getName(), ver.getId() );
+			}
+		}
+		// getting the ids corresponding to the names
+		Collection<String> ids = new HashSet<String>();
+		for( String name : versionNames ){
+			if ( name != null )
+			{
+				final String id = map.get( name.trim() );
+				if ( id == null ) {
+					logger.println( "Cannot find version " + name + " in project " + projectKey );
+				} else {
+					ids.add( id );
+				}
+			}
+		}
+		return ids;
 	}
 
 	private void updateIssueStatus(SOAPClient client, SOAPSession session, RemoteIssue issue, PrintStream logger) {
