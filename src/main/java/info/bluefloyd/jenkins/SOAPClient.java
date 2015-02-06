@@ -55,7 +55,7 @@ public class SOAPClient {
 		return soapSession;
 	}
 
-	public List<RemoteIssue> findIssuesByJQL(SOAPSession session, String jql) {
+	public List<RemoteIssue> findIssuesByJQL(SOAPSession session, String jql) throws JqlException {
 		LOGGER.info("Searching for issues by JQL query: " + jql);
 		RemoteIssue[] issuesFromJQLSearch = null;
 		String token = session.getAuthenticationToken();
@@ -64,8 +64,10 @@ public class SOAPClient {
 			issuesFromJQLSearch = jiraSoapService.getIssuesFromJqlSearch(token, jql, MAX_NUMBER_OF_ISSUES_RETURNED + 1);
 		} catch (com.atlassian.jira.rpc.soap.client.RemoteException e) {
 			LOGGER.error("Cannot execute Jira issue search by JQL: " + jql, e);
+			throw new JqlException(e.getFaultString());
 		} catch (RemoteException e) {
 			LOGGER.error("Cannot execute Jira issue search by JQL: " + jql, e);
+			throw new JqlException(e.getMessage());
 		}
 		if (issuesFromJQLSearch != null) {
 			List<RemoteIssue> results = Arrays.asList(issuesFromJQLSearch);
