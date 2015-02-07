@@ -32,6 +32,7 @@ import org.kohsuke.stapler.StaplerRequest;
 
 import com.atlassian.jira.rpc.soap.client.RemoteIssue;
 import com.atlassian.jira.rpc.soap.client.RemoteVersion;
+import java.util.ArrayList;
 
 /**
  * <p>
@@ -68,6 +69,8 @@ public class IssueUpdatesBuilder extends Builder {
 	
 	private boolean resettingFixedVersions;
 	private String fixedVersions;
+	private boolean failIfJqlFails;
+	private boolean failIfNoIssuesReturned;
 	transient List<String> fixedVersionNames;
 	
 	// Temporarily cache the version String-ID mapping for multiple
@@ -77,7 +80,8 @@ public class IssueUpdatesBuilder extends Builder {
 	transient Map<String, Map<String, String>> projectVersionNameIdCache;
 
 	@DataBoundConstructor
-	public IssueUpdatesBuilder(String soapUrl, String userName, String password, String jql, String workflowActionName, String comment, boolean resettingFixedVersions, String fixedVersions ) {
+	public IssueUpdatesBuilder(String soapUrl, String userName, String password, String jql, String workflowActionName, 
+                String comment, boolean resettingFixedVersions, String fixedVersions, boolean failIfJqlFails, boolean failIfNoIssuesReturned) {
 		this.soapUrl = soapUrl;
 		this.userName = userName;
 		this.password = password;
@@ -86,6 +90,8 @@ public class IssueUpdatesBuilder extends Builder {
 		this.comment = comment;
 		this.resettingFixedVersions = resettingFixedVersions;
 		this.fixedVersions = fixedVersions;
+		this.failIfJqlFails = failIfJqlFails;
+		this.failIfNoIssuesReturned = failIfNoIssuesReturned;
 	}
 
 	/**
@@ -140,6 +146,14 @@ public class IssueUpdatesBuilder extends Builder {
 		return resettingFixedVersions;
 	}
 
+	public boolean isFailIfJqlFails() {
+		return failIfJqlFails;
+	}
+
+	public boolean isFailIfNoIssuesReturned() {
+		return failIfNoIssuesReturned;
+	}
+
 	@Override
 	public boolean perform(AbstractBuild<?, ?> build, Launcher launcher, BuildListener listener) throws IOException, InterruptedException {
 		PrintStream logger = listener.getLogger();       
@@ -161,9 +175,21 @@ public class IssueUpdatesBuilder extends Builder {
 			return true;
 		}
 
-		List<RemoteIssue> issues = client.findIssuesByJQL(session, realJql);
+		List<RemoteIssue> issues = new ArrayList<RemoteIssue>();
+		try {
+			client.findIssuesByJQL(session, realJql);
+		} catch (JqlException e) {
+			if (this.failIfJqlFails) {
+				logger.println("Jira could not execute your JQL, '" + realJql + "': " + e.getMessage());
+				return false;
+			}
+		}
 		if (issues.isEmpty()) {
 			logger.println("Your JQL, '" + realJql + "' did not return any issues. No issues will be updated during this build.");
+			if (this.failIfNoIssuesReturned) {
+				logger.println("Checkbox 'Fail this build if no issues are matched' checked, failing build");
+				return false;
+			}
 		} else {
 			if (realWorkflowActionName.isEmpty()) {
 				logger.println("No workflow action was specified, thus no status update will be made for any of the matching issues.");
