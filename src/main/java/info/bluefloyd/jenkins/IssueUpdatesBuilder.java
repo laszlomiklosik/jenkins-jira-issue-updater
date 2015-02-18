@@ -177,7 +177,7 @@ public class IssueUpdatesBuilder extends Builder {
 
 		List<RemoteIssue> issues = new ArrayList<RemoteIssue>();
 		try {
-			client.findIssuesByJQL(session, realJql);
+			issues = client.findIssuesByJQL(session, realJql);
 		} catch (JqlException e) {
 			if (this.failIfJqlFails) {
 				logger.println("Jira could not execute your JQL, '" + realJql + "': " + e.getMessage());
