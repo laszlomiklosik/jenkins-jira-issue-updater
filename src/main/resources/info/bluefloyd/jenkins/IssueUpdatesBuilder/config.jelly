@@ -28,6 +28,14 @@
   <f:entry title="Jira comment to be added" field="comment">
     <f:textbox />
   </f:entry>
+
+  <f:entry title="Jira custom field to be edited" field="customFieldId">
+    <f:textbox />
+  </f:entry>
+
+  <f:entry title="Jira custom field value" field="customFieldValue">
+    <f:textbox />
+  </f:entry>
   
   <f:entry title="Remove existing fixed versions first" field="resettingFixedVersions">
     <f:checkbox />

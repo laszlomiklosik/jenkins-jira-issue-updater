@@ -63,9 +63,12 @@ public class IssueUpdatesBuilder extends Builder {
 	private final String jql;
 	private final String workflowActionName;
 	private final String comment;
+	private final String customFieldId;
+	private final String customFieldValue;
 	private String realJql;
 	private String realWorkflowActionName;
 	private String realComment;
+	private String realFieldValue;
 	
 	private boolean resettingFixedVersions;
 	private String fixedVersions;
@@ -80,14 +83,17 @@ public class IssueUpdatesBuilder extends Builder {
 	transient Map<String, Map<String, String>> projectVersionNameIdCache;
 
 	@DataBoundConstructor
-	public IssueUpdatesBuilder(String soapUrl, String userName, String password, String jql, String workflowActionName, 
-                String comment, boolean resettingFixedVersions, String fixedVersions, boolean failIfJqlFails, boolean failIfNoIssuesReturned) {
+	public IssueUpdatesBuilder(String soapUrl, String userName, String password, String jql, String workflowActionName,
+							   String comment,String customFieldId,String customFieldValue, boolean resettingFixedVersions,
+							   String fixedVersions, boolean failIfJqlFails, boolean failIfNoIssuesReturned) {
 		this.soapUrl = soapUrl;
 		this.userName = userName;
 		this.password = password;
 		this.jql = jql;
 		this.workflowActionName = workflowActionName;
 		this.comment = comment;
+		this.customFieldId = customFieldId;
+		this.customFieldValue = customFieldValue;
 		this.resettingFixedVersions = resettingFixedVersions;
 		this.fixedVersions = fixedVersions;
 		this.failIfJqlFails = failIfJqlFails;
@@ -136,6 +142,14 @@ public class IssueUpdatesBuilder extends Builder {
 		return comment;
 	}
 	
+	public String getCustomFieldId() {
+		return customFieldId;
+	}
+
+	public String getCustomFieldValue() {
+		return customFieldValue;
+	}
+
 	public String getFixedVersions()
 	{
 		return fixedVersions;
@@ -208,6 +222,7 @@ public class IssueUpdatesBuilder extends Builder {
 			listener.getLogger().println(issue.getKey() + "  \t" + issue.getSummary());
 			updateIssueStatus(client, session, issue, logger);
 			addIssueComment(client, session, issue, logger);
+			updateIssueField(client, session, issue, logger);
 			updateFixedVersions(client, session, issue, logger);
 		}
 		return true;
@@ -218,6 +233,7 @@ public class IssueUpdatesBuilder extends Builder {
 		realJql = jql;
 		realWorkflowActionName = workflowActionName;
 		realComment = comment;
+		realFieldValue = customFieldValue;
 		String expandedFixedVersions = fixedVersions == null ? "" : fixedVersions.trim();
 		
 		// build parameter substitution
@@ -225,6 +241,7 @@ public class IssueUpdatesBuilder extends Builder {
 			realJql = substituteEnvVar( realJql, entry.getKey(), entry.getValue() );
 			realWorkflowActionName = substituteEnvVar( realWorkflowActionName, entry.getKey(), entry.getValue() );
 			realComment = substituteEnvVar( realComment, entry.getKey(), entry.getValue() );
+			realFieldValue = substituteEnvVar( realFieldValue, entry.getKey(), entry.getValue() );
 			expandedFixedVersions = substituteEnvVar( expandedFixedVersions, entry.getKey(), entry.getValue() );
 		}
 		// NOTE: did not trim
@@ -329,6 +346,16 @@ public class IssueUpdatesBuilder extends Builder {
 			addMessageSuccessful = client.addIssueComment(session, issue.getKey(), realComment);
 			if (!addMessageSuccessful) {
 				logger.println("Could not add message to issue " + issue.getKey());
+			}
+		}
+	}
+
+	private void updateIssueField(SOAPClient client, SOAPSession session, RemoteIssue issue, PrintStream logger) {
+		boolean updateFieldSuccessful = false;
+		if (!customFieldId.trim().isEmpty()) {
+			updateFieldSuccessful = client.updateIssueField(session, issue.getKey(), customFieldId, realFieldValue);
+			if (!updateFieldSuccessful) {
+				logger.println("Could not update field " + customFieldId + "for issue " + issue.getKey());
 			}
 		}
 	}
