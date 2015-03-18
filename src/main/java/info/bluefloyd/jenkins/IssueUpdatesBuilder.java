@@ -84,7 +84,7 @@ public class IssueUpdatesBuilder extends Builder {
 
 	@DataBoundConstructor
 	public IssueUpdatesBuilder(String soapUrl, String userName, String password, String jql, String workflowActionName,
-							   String comment,String customFieldId,String customFieldValue, boolean resettingFixedVersions,
+							   String comment, String customFieldId, String customFieldValue, boolean resettingFixedVersions,
 							   String fixedVersions, boolean failIfJqlFails, boolean failIfNoIssuesReturned) {
 		this.soapUrl = soapUrl;
 		this.userName = userName;
