@@ -17,6 +17,8 @@ public class IssueUpdatesBuilderTest
 	{
 		String jql = "$SQL_var $NO_ENV";  // NO_ENV does not exist.
 		String comment = "$CMT _$$CMT $SQL_var $ActionName $VERSION2";
+		String fieldId = "customfield_10862";
+		String fieldValue = "$SQL_var ver $VERSION2";
 		String workflowActionName ="  $ActionName $ ActionName";
 		String fixedVersions = "v1,$VERSION2,$VERSIONS";
 		
@@ -27,7 +29,7 @@ public class IssueUpdatesBuilderTest
 		vars.put( "VERSION2", "v2" );
 		vars.put( "VERSIONS", "v3,v4,v5" );
 		
-		IssueUpdatesBuilder builder = new IssueUpdatesBuilder( "soapUrl", "userName", "password", jql, workflowActionName, comment, true, fixedVersions, true, true );
+		IssueUpdatesBuilder builder = new IssueUpdatesBuilder( "soapUrl", "userName", "password", jql, workflowActionName, comment, fieldId, fieldValue, true, fixedVersions, true, true );
 		Assert.assertEquals( "var1 var1 $var1", builder.substituteEnvVar( "$VAR $VAR $$VAR", "VAR", "var1"  ) );
 
 		builder.substituteEnvVars( vars );

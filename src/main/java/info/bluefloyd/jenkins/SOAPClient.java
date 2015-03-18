@@ -174,17 +174,29 @@ public class SOAPClient {
 	 */
 	public boolean updateFixedVersions( SOAPSession session, final RemoteIssue issue, Collection<String> finalVersionIds )
 	{
+		return updateIssueField(session, issue.getKey(), "fixVersions", finalVersionIds.toArray( new String[]{} ));
+	}
+
+	public boolean updateIssueField(SOAPSession session, final String issueKey, String fieldId, String fieldValue)
+	{
+		return updateIssueField(session, issueKey, fieldId, new String[]{fieldValue});
+	}
+
+	public boolean updateIssueField(SOAPSession session, final String issueKey, String fieldId, String[] fieldValue)
+	{
 		String token = session.getAuthenticationToken();
-		JiraSoapService soap = session.getJiraSoapService();
+		JiraSoapService jiraSoapService = session.getJiraSoapService();
+
+		RemoteFieldValue rf = new RemoteFieldValue(fieldId, fieldValue);
+
 		boolean successful = false;
-		try
-		{	
-			RemoteFieldValue fixedVersionsValue = new RemoteFieldValue( "fixVersions", finalVersionIds.toArray( new String[]{} ) );
-			soap.updateIssue( token, issue.getKey(),  new RemoteFieldValue[] { fixedVersionsValue} );
+		try {
+			jiraSoapService.updateIssue( token, issueKey,  new RemoteFieldValue[] { rf} );
 			successful = true;
 		} catch (RemoteException e) {
-			LOGGER.error( "Error setting fixed versions to issue: " + issue.getKey(), e);
+			LOGGER.error( "Error setting " + fieldId + " to issue: " + issueKey, e);
 		}
 		return successful;
 	}
+
 }
