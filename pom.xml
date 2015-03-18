@@ -2,7 +2,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>info.bluefloyd.jenkins</groupId>
 	<artifactId>jenkins-jira-issue-updater</artifactId>
-	<version>1.10</version>
+	<version>1.11-SNAPSHOT</version>
 	<packaging>hpi</packaging>
 	<name>Jenkins Jira Issue Updater</name>
 	<description>Jenkins plugin which can update Jira issues in a maven or a freestyle job.</description>
