@@ -352,7 +352,7 @@ public class IssueUpdatesBuilder extends Builder {
 
 	private void updateIssueField(SOAPClient client, SOAPSession session, RemoteIssue issue, PrintStream logger) {
 		boolean updateFieldSuccessful = false;
-		if (!customFieldId.trim().isEmpty()) {
+		if ( customFieldId != null && !customFieldId.trim().isEmpty()) {
 			updateFieldSuccessful = client.updateIssueField(session, issue.getKey(), customFieldId, realFieldValue);
 			if (!updateFieldSuccessful) {
 				logger.println("Could not update field " + customFieldId + "for issue " + issue.getKey());
