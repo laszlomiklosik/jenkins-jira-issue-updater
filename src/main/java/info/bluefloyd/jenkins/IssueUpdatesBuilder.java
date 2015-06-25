@@ -71,6 +71,7 @@ public class IssueUpdatesBuilder extends Builder {
 	private String realFieldValue;
 	
 	private boolean resettingFixedVersions;
+	private boolean createNonExistingFixedVersions;
 	private String fixedVersions;
 	private boolean failIfJqlFails;
 	private boolean failIfNoIssuesReturned;
@@ -85,7 +86,8 @@ public class IssueUpdatesBuilder extends Builder {
 	@DataBoundConstructor
 	public IssueUpdatesBuilder(String soapUrl, String userName, String password, String jql, String workflowActionName,
 							   String comment, String customFieldId, String customFieldValue, boolean resettingFixedVersions,
-							   String fixedVersions, boolean failIfJqlFails, boolean failIfNoIssuesReturned) {
+							   boolean createNonExistingFixedVersions, String fixedVersions, boolean failIfJqlFails, 
+							   boolean failIfNoIssuesReturned) {
 		this.soapUrl = soapUrl;
 		this.userName = userName;
 		this.password = password;
@@ -95,6 +97,7 @@ public class IssueUpdatesBuilder extends Builder {
 		this.customFieldId = customFieldId;
 		this.customFieldValue = customFieldValue;
 		this.resettingFixedVersions = resettingFixedVersions;
+		this.createNonExistingFixedVersions = createNonExistingFixedVersions;
 		this.fixedVersions = fixedVersions;
 		this.failIfJqlFails = failIfJqlFails;
 		this.failIfNoIssuesReturned = failIfNoIssuesReturned;
@@ -319,7 +322,14 @@ public class IssueUpdatesBuilder extends Builder {
 			{
 				final String id = map.get( name.trim() );
 				if ( id == null ) {
-					logger.println( "Cannot find version " + name + " in project " + projectKey );
+					if(createNonExistingFixedVersions) {
+						logger.println( "Creating Non-existent version " + name + " in project " + projectKey );	
+						RemoteVersion newVersion = client.addVersion(session, projectKey, name);
+						ids.add(newVersion.getId());	
+					}
+					else {
+						logger.println( "Cannot find version " + name + " in project " + projectKey );	
+					}
 				} else {
 					ids.add( id );
 				}

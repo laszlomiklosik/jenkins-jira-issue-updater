@@ -140,6 +140,31 @@ public class SOAPClient {
 		return commentAdded;
 	}
 	
+
+	/**
+	 * Add a Version to the specified peoject.
+	 * @param session
+	 * @param projectKey	project key
+	 * @param version       The version to be created
+	 * @return
+	 */
+	public RemoteVersion addVersion( SOAPSession session, String projectKey, String version ) {
+		String token = session.getAuthenticationToken();
+		JiraSoapService soap = session.getJiraSoapService();
+
+		RemoteVersion newVersion = new RemoteVersion();
+		newVersion.setName(version);
+
+		try	{
+			return soap.addVersion(token, projectKey, newVersion);
+		} catch ( RemoteException e ) {
+			LOGGER.error( "Error creating version " + version + " for project " + projectKey, e);
+		}
+
+		return newVersion;
+	}
+
+
 	/**
 	 * Returns all versions defined for specified peoject.
 	 * @param session
