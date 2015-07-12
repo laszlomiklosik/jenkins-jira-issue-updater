@@ -71,6 +71,7 @@ public class IssueUpdatesBuilder extends Builder {
 	private String realFieldValue;
 	
 	private boolean resettingFixedVersions;
+	private boolean createNonExistingFixedVersions;
 	private String fixedVersions;
 	private boolean failIfJqlFails;
 	private boolean failIfNoIssuesReturned;
@@ -85,7 +86,8 @@ public class IssueUpdatesBuilder extends Builder {
 	@DataBoundConstructor
 	public IssueUpdatesBuilder(String soapUrl, String userName, String password, String jql, String workflowActionName,
 							   String comment, String customFieldId, String customFieldValue, boolean resettingFixedVersions,
-							   String fixedVersions, boolean failIfJqlFails, boolean failIfNoIssuesReturned) {
+							   boolean createNonExistingFixedVersions, String fixedVersions, boolean failIfJqlFails, 
+							   boolean failIfNoIssuesReturned) {
 		this.soapUrl = soapUrl;
 		this.userName = userName;
 		this.password = password;
@@ -95,6 +97,7 @@ public class IssueUpdatesBuilder extends Builder {
 		this.customFieldId = customFieldId;
 		this.customFieldValue = customFieldValue;
 		this.resettingFixedVersions = resettingFixedVersions;
+		this.createNonExistingFixedVersions = createNonExistingFixedVersions;
 		this.fixedVersions = fixedVersions;
 		this.failIfJqlFails = failIfJqlFails;
 		this.failIfNoIssuesReturned = failIfNoIssuesReturned;
@@ -218,12 +221,20 @@ public class IssueUpdatesBuilder extends Builder {
 		// reset the cache
 		projectVersionNameIdCache = new ConcurrentHashMap<String, Map<String,String>>();
 		
+		// add the ids of the fixed versions if there are any
+		// This will also create new versions, if the Option is given.
+		Collection<String> fixVersionIds = new HashSet<String>();
+		if ( ! fixedVersionNames.isEmpty() ) {
+			fixVersionIds.addAll( mapFixedVersionNamesToIds(client, session, issues.get(0).getProject(), fixedVersionNames, logger) );
+		}
+
+
 		for (RemoteIssue issue : issues) {
 			listener.getLogger().println(issue.getKey() + "  \t" + issue.getSummary());
 			updateIssueStatus(client, session, issue, logger);
 			addIssueComment(client, session, issue, logger);
 			updateIssueField(client, session, issue, logger);
-			updateFixedVersions(client, session, issue, logger);
+			updateFixedVersions(client, session, issue, fixVersionIds, logger);
 		}
 		return true;
 	}
@@ -256,15 +267,14 @@ public class IssueUpdatesBuilder extends Builder {
 		return origin;
 	}
 
-	private void updateFixedVersions(SOAPClient client, SOAPSession session, RemoteIssue issue, PrintStream logger) {
+	private void updateFixedVersions(SOAPClient client, SOAPSession session, RemoteIssue issue, Collection<String> fixVersionIds, PrintStream logger) {
 		// NOT resettingFixedVersions and EMPTY fixedVersionNames: do not need to update the issue,
 		// otherwise:
 		if ( resettingFixedVersions || ! fixedVersionNames.isEmpty() ) {
-			// add the ids of the fixed versions
-			Collection<String> finalVersionIds = new HashSet<String>();
-			if ( ! fixedVersionNames.isEmpty() ) {
-				finalVersionIds.addAll( mapFixedVersionNamesToIds( client, session, issue.getProject(), fixedVersionNames, logger ) );
-			}
+			
+			//Copy The Given Remote ID's to be applied to a local Variable. In case Old Versions should be kept we need to add them here
+			Collection<String> finalVersionIds = fixVersionIds;
+
 			// if not reset origin fixed versions, then also merge their IDs to the set.
 			if ( ! resettingFixedVersions ) {
 				for( RemoteVersion ver : issue.getFixVersions() ) {
@@ -319,7 +329,19 @@ public class IssueUpdatesBuilder extends Builder {
 			{
 				final String id = map.get( name.trim() );
 				if ( id == null ) {
-					logger.println( "Cannot find version " + name + " in project " + projectKey );
+					if(createNonExistingFixedVersions) {
+						logger.println( "Creating Non-existent version " + name + " in project " + projectKey );	
+						RemoteVersion newVersion = client.addVersion(session, projectKey, name);
+						if(newVersion.getId() != null) {
+							ids.add(newVersion.getId());		
+						}
+						else {
+							logger.println( "There was a problem creating Version " + name + " in project " + projectKey );
+						}
+					}
+					else {
+						logger.println( "Cannot find version " + name + " in project " + projectKey );	
+					}
 				} else {
 					ids.add( id );
 				}
