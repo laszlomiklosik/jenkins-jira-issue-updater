@@ -218,15 +218,17 @@ public class IssueUpdatesBuilder extends Builder {
 			logger.println("The selected issues (" + issues.size() + " in total) are:");
 		}
 
-		// reset the cache
-		projectVersionNameIdCache = new ConcurrentHashMap<String, Map<String,String>>();
-		
-		// add the ids of the fixed versions if there are any
-		// This will also create new versions, if the Option is given.
-		Collection<String> fixVersionIds = new HashSet<String>();
-		if ( ! fixedVersionNames.isEmpty() ) {
-			fixVersionIds.addAll( mapFixedVersionNamesToIds(client, session, issues.get(0).getProject(), fixedVersionNames, logger) );
-		}
+                // reset the cache
+                projectVersionNameIdCache = new ConcurrentHashMap<String, Map<String,String>>();
+
+                // add the ids of the fixed versions if there are any
+                // This will also create new versions, if the Option is given.
+                Collection<String> fixVersionIds = new HashSet<String>();
+                if (!issues.isEmpty()) {
+                    if ( ! fixedVersionNames.isEmpty() ) {
+                            fixVersionIds.addAll( mapFixedVersionNamesToIds(client, session, issues.get(0).getProject(), fixedVersionNames, logger) );
+                    }
+                }
 
 
 		for (RemoteIssue issue : issues) {
