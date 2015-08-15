@@ -218,23 +218,15 @@ public class IssueUpdatesBuilder extends Builder {
 			logger.println("The selected issues (" + issues.size() + " in total) are:");
 		}
 
-		// reset the cache
-		projectVersionNameIdCache = new ConcurrentHashMap<String, Map<String,String>>();
-		
-		// add the ids of the fixed versions if there are any
-		// This will also create new versions, if the Option is given.
-		Collection<String> fixVersionIds = new HashSet<String>();
-		if ( ! fixedVersionNames.isEmpty() ) {
-			fixVersionIds.addAll( mapFixedVersionNamesToIds(client, session, issues.get(0).getProject(), fixedVersionNames, logger) );
-		}
-
+                // reset the cache
+                projectVersionNameIdCache = new ConcurrentHashMap<String, Map<String,String>>();
 
 		for (RemoteIssue issue : issues) {
 			listener.getLogger().println(issue.getKey() + "  \t" + issue.getSummary());
 			updateIssueStatus(client, session, issue, logger);
 			addIssueComment(client, session, issue, logger);
 			updateIssueField(client, session, issue, logger);
-			updateFixedVersions(client, session, issue, fixVersionIds, logger);
+			updateFixedVersions(client, session, issue, logger);
 		}
 		return true;
 	}
@@ -267,13 +259,16 @@ public class IssueUpdatesBuilder extends Builder {
 		return origin;
 	}
 
-	private void updateFixedVersions(SOAPClient client, SOAPSession session, RemoteIssue issue, Collection<String> fixVersionIds, PrintStream logger) {
+	private void updateFixedVersions(SOAPClient client, SOAPSession session, RemoteIssue issue, PrintStream logger) {
 		// NOT resettingFixedVersions and EMPTY fixedVersionNames: do not need to update the issue,
 		// otherwise:
 		if ( resettingFixedVersions || ! fixedVersionNames.isEmpty() ) {
 			
 			//Copy The Given Remote ID's to be applied to a local Variable. In case Old Versions should be kept we need to add them here
-			Collection<String> finalVersionIds = fixVersionIds;
+			Collection<String> finalVersionIds = new HashSet<String>();
+			if ( ! fixedVersionNames.isEmpty() ) {
+				finalVersionIds.addAll( mapFixedVersionNamesToIds( client, session, issue.getProject(), fixedVersionNames, logger ) );
+			}
 
 			// if not reset origin fixed versions, then also merge their IDs to the set.
 			if ( ! resettingFixedVersions ) {
@@ -333,7 +328,8 @@ public class IssueUpdatesBuilder extends Builder {
 						logger.println( "Creating Non-existent version " + name + " in project " + projectKey );	
 						RemoteVersion newVersion = client.addVersion(session, projectKey, name);
 						if(newVersion.getId() != null) {
-							ids.add(newVersion.getId());		
+							ids.add(newVersion.getId());
+							map.put(name, newVersion.getId());
 						}
 						else {
 							logger.println( "There was a problem creating Version " + name + " in project " + projectKey );
