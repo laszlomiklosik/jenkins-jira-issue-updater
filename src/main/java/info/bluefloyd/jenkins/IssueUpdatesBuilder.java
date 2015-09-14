@@ -8,8 +8,6 @@ import hudson.model.AbstractProject;
 import hudson.tasks.BuildStepDescriptor;
 import hudson.tasks.Builder;
 import hudson.util.FormValidation;
-import info.bluefloyd.jenkins.SOAPClient;
-import info.bluefloyd.jenkins.SOAPSession;
 
 import java.io.IOException;
 import java.io.PrintStream;
@@ -73,8 +71,10 @@ public class IssueUpdatesBuilder extends Builder {
 	private boolean resettingFixedVersions;
 	private boolean createNonExistingFixedVersions;
 	private String fixedVersions;
-	private boolean failIfJqlFails;
-	private boolean failIfNoIssuesReturned;
+	private final boolean failIfJqlFails;
+	private final boolean failIfNoIssuesReturned;
+	private final boolean failIfNoJiraConnection;
+
 	transient List<String> fixedVersionNames;
 	
 	// Temporarily cache the version String-ID mapping for multiple
@@ -87,7 +87,7 @@ public class IssueUpdatesBuilder extends Builder {
 	public IssueUpdatesBuilder(String soapUrl, String userName, String password, String jql, String workflowActionName,
 							   String comment, String customFieldId, String customFieldValue, boolean resettingFixedVersions,
 							   boolean createNonExistingFixedVersions, String fixedVersions, boolean failIfJqlFails, 
-							   boolean failIfNoIssuesReturned) {
+							   boolean failIfNoIssuesReturned, boolean failIfNoJiraConnection) {
 		this.soapUrl = soapUrl;
 		this.userName = userName;
 		this.password = password;
@@ -101,6 +101,7 @@ public class IssueUpdatesBuilder extends Builder {
 		this.fixedVersions = fixedVersions;
 		this.failIfJqlFails = failIfJqlFails;
 		this.failIfNoIssuesReturned = failIfNoIssuesReturned;
+		this.failIfNoJiraConnection = failIfNoJiraConnection;
 	}
 
 	/**
@@ -171,6 +172,10 @@ public class IssueUpdatesBuilder extends Builder {
 		return failIfNoIssuesReturned;
 	}
 
+	public boolean isFailIfNoJiraConnection() {
+		return failIfNoJiraConnection;
+	}
+        
 	@Override
 	public boolean perform(AbstractBuild<?, ?> build, Launcher launcher, BuildListener listener) throws IOException, InterruptedException {
 		PrintStream logger = listener.getLogger();       
@@ -189,7 +194,7 @@ public class IssueUpdatesBuilder extends Builder {
 					+ ". Make sure Jira is started, reachable from this machine, has SOAP enabled and the given SOAP url is correct.");
 			logger.println("- the given Jira credentials are incorrect.");
 			logger.println("You can find details on the exact problem in the Jenkins server logs.");
-			return true;
+			return !this.failIfNoJiraConnection;
 		}
 
 		List<RemoteIssue> issues = new ArrayList<RemoteIssue>();

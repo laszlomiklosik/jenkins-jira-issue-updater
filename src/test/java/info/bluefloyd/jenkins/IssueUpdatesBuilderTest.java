@@ -29,7 +29,7 @@ public class IssueUpdatesBuilderTest
 		vars.put( "VERSION2", "v2" );
 		vars.put( "VERSIONS", "v3,v4,v5" );
 		
-		IssueUpdatesBuilder builder = new IssueUpdatesBuilder( "soapUrl", "userName", "password", jql, workflowActionName, comment, fieldId, fieldValue, true, true, fixedVersions, true, true );
+		IssueUpdatesBuilder builder = new IssueUpdatesBuilder( "soapUrl", "userName", "password", jql, workflowActionName, comment, fieldId, fieldValue, true, true, fixedVersions, true, true, true);
 		Assert.assertEquals( "var1 var1 $var1", builder.substituteEnvVar( "$VAR $VAR $$VAR", "VAR", "var1"  ) );
 
 		builder.substituteEnvVars( vars );
