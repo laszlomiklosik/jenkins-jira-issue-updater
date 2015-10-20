@@ -200,7 +200,7 @@ public class IssueUpdatesBuilder extends Builder {
     // reset the cache
     projectVersionNameIdCache = new ConcurrentHashMap<String, Map<String, String>>();
 
-    if (!fixedVersions.isEmpty()) {
+    if (fixedVersions != null && !fixedVersions.isEmpty()) {
       fixedVersionNames = Arrays.asList(fixedVersions.split(FIXED_VERSIONS_LIST_DELIMITER));
     }
 
