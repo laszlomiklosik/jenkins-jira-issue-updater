@@ -177,45 +177,31 @@ public class IssueUpdatesBuilder extends Builder {
     Map<String, String> vars = new HashMap<String, String>();
     vars.putAll(build.getEnvironment(listener));
     vars.putAll(build.getBuildVariables());
-
     substituteEnvVars(vars);
 
-    // Set up the REST API with the common information (base rest path, credentials, logger
     RESTClient client = new RESTClient(getRestAPIUrl(),getUserName(), getPassword(),logger);
     
-    // Find the list of issues we are interested in, maximum of 10
-    IssueSummaryList issueSummary = null;
-    try {
-      issueSummary = client.findIssuesByJQL(realJql);
-    } catch (Exception e) {
-      if (this.failIfJqlFails) {
-        logger.println("Jira could not execute your JQL, '" + realJql + "': " + e.getMessage());
-        return false;
-      }
+    // Find the list of issues we are interested in, maximum of 10000
+    IssueSummaryList issueSummary = client.findIssuesByJQL(realJql);
+    if (issueSummary == null) {
+      return !failIfJqlFails;
     }
 
-    if (issueSummary == null || issueSummary.getIssues().isEmpty()) {
+    if (issueSummary.getIssues().isEmpty()) {
       logger.println("Your JQL, '" + realJql + "' did not return any issues. No issues will be updated during this build.");
-      if (this.failIfNoIssuesReturned) {
+      if (failIfNoIssuesReturned) {
         logger.println("Checkbox 'Fail this build if no issues are matched' checked, failing build");
         return false;
+      } else {
+        return true;
       }
-    } else {
-      if (realWorkflowActionName.isEmpty()) {
-        logger.println("No workflow action was specified, thus no status update will be made for any of the matching issues.");
-      }
-      if (realComment.isEmpty()) {
-        logger.println("No comment was specified, thus no comment will be added to any of the matching issues.");
-      }
-      logger.println("Using JQL: " + realJql);
-      logger.println("The selected issues (" + issueSummary.getIssues().size() + " in total) are:");
     }
-
+    
     // reset the cache
     projectVersionNameIdCache = new ConcurrentHashMap<String, Map<String, String>>();
 
     // Perform the actions on each found JIRA
-    if (issueSummary != null && issueSummary.getIssues() != null) {
+    if (issueSummary.getIssues() != null) {
       for (IssueSummary issue : issueSummary.getIssues()) {
         logger.println("Updating " + issue.getKey() + "  \t" + issue.getFields().getSummary());
         client.updateIssueStatus(issue, realWorkflowActionName);

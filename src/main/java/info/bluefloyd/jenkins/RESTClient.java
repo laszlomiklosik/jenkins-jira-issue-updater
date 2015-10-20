@@ -16,11 +16,13 @@ import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Simple generic REST client based on native HTTP. Also contains a logic layer
  * to allow easy interaction with the JIRA REST API.
- * 
+ *
  * @author Ian Sparkes, Swisscom AG
  */
 public class RESTClient {
@@ -44,7 +46,7 @@ public class RESTClient {
     this.userName = userName;
     this.password = password;
     this.logger = logger;
-    
+
     String rawAuth = userName + ":" + password;
     Base64Encoder encoder = new Base64Encoder();
     basicAuthToken = "Basic " + encoder.encode(rawAuth.getBytes("UTF-8"));
@@ -52,37 +54,65 @@ public class RESTClient {
 
   /**
    * Get back a minimal list of the issues we are interested in, as determined
-   * by the given JQL. We only recover the first 10 issues, and more than that
+   * by the given JQL. We only recover the first 10k issues, and more than that
    * is likely to be a mistake.
    *
+   * An error in making the REST call or decoding the response results in a null
+   * result.
+   *
    * @param jql
-   * @return The list of issues
-   * @throws MalformedURLException
-   * @throws IOException
+   * @return The list of issues, null if exception, empty list if no matching
+   * issues
    */
-  public IssueSummaryList findIssuesByJQL(String jql) throws MalformedURLException, IOException {
-
-    URL findIssueURL = new URL(baseAPIUrl + REST_SEARCH_PATH);
-
+  public IssueSummaryList findIssuesByJQL(String jql) {
+    String findIssueUrlString = baseAPIUrl + REST_SEARCH_PATH;
     if (debug) {
-      logger.println("***Using this URL for finding the issues: " + findIssueURL.toString());
+      logger.println("***Using this URL for finding the issues: " + findIssueUrlString);
+    }
+
+    URL findIssueURL;
+    try {
+      findIssueURL = new URL(findIssueUrlString);
+    } catch (MalformedURLException ex) {
+      logger.println("Unable to parse URL string " + findIssueUrlString);
+      logger.print(ex);
+      return null;
     }
 
     String bodydata = "{"
             + "    \"jql\": \"" + jql + "\",\n"
             + "    \"startAt\": 0,\n"
-            + "    \"maxResults\": 10,\n"
+            + "    \"maxResults\": 10000,\n"
             + "    \"fields\": [\n"
             + "        \"summary\"\n"
             + "    ]\n"
             + "}";
 
-    RestResult result = doPost(findIssueURL, bodydata);
+    RestResult result;
+    try {
+      result = doPost(findIssueURL, bodydata);
+    } catch (IOException ex) {
+      logger.println("Unable to connect to REST service");
+      logger.print(ex);
+      return null;
+    }
 
-    ObjectMapper mapper = new ObjectMapper();
-    IssueSummaryList summaryList = mapper.readValue(result.getResultMessage(), IssueSummaryList.class);
+    if (result.isValidResult()) {
+      ObjectMapper mapper = new ObjectMapper();
+      IssueSummaryList summaryList;
+      try {
+        summaryList = mapper.readValue(result.getResultMessage(), IssueSummaryList.class);
+      } catch (IOException ex) {
+        logger.println("Unable to parse JSON result: " + result.getResultMessage());
+        logger.print(ex);
+        return null;
+      }
 
-    return summaryList;
+      return summaryList;
+    } else {
+      logger.println("Unable to find issues: " + result.getResultMessage());
+      return null;
+    }
   }
 
   /**
@@ -90,45 +120,66 @@ public class RESTClient {
    *
    * @param issue The issue we want to update
    * @param realWorkflowActionName The target status
-   * @throws MalformedURLException
    */
-  public void updateIssueStatus(IssueSummary issue, String realWorkflowActionName) throws MalformedURLException {
-    String transitionPath = REST_UPDATE_STATUS_PATH.replaceAll("\\{issue-key\\}", issue.getKey());
-    URL transitionURL = new URL(baseAPIUrl + transitionPath);
-
+  public void updateIssueStatus(IssueSummary issue, String realWorkflowActionName) {
+    String transitionPath = baseAPIUrl + REST_UPDATE_STATUS_PATH.replaceAll("\\{issue-key\\}", issue.getKey());
     if (debug) {
-      logger.println("***Using this URL for finding the transition: " + transitionURL.toString());
+      logger.println("***Using this URL for finding the transition: " + transitionPath);
+    }
+
+    URL transitionURL;
+    try {
+      transitionURL = new URL(transitionPath);
+    } catch (MalformedURLException ex) {
+      logger.println("Unable to parse URL string " + transitionPath);
+      logger.print(ex);
+      return;
     }
 
     if (!realWorkflowActionName.trim().isEmpty()) {
-
-      // See if the issue can transition to the given status, and transition
+      // Get possible transitions
+      RestResult result;
       try {
-        RestResult result = doGet(transitionURL);
+        result = doGet(transitionURL);
+      } catch (IOException ex) {
+        logger.println("Unable to connect to REST service to check possible transitions");
+        logger.print(ex);
+        return;
+      }
 
+      if (result.isValidResult()) {
         ObjectMapper mapper = new ObjectMapper();
         mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-        TransitionList possibleTransition = mapper.readValue(result.getResultMessage(), TransitionList.class);
+        TransitionList possibleTransition;
+        try {
+          possibleTransition = mapper.readValue(result.getResultMessage(), TransitionList.class);
+        } catch (IOException ex) {
+          logger.println("Unable to parse JSON result: " + result.getResultMessage());
+          logger.print(ex);
+          return;
+        }
 
-        // See if we can find the required transition in the list
         if (possibleTransition.containsTransition(realWorkflowActionName)) {
           Integer targetTransitionId = possibleTransition.getTransitionId(realWorkflowActionName);
-          String bodydata = "{"
-                  + "    \"transition\": \"" + targetTransitionId + "\"\n"
-                  + "}";
+          String bodydata = "{\"transition\": \"" + targetTransitionId + "\"}";
 
-          // There is a result, but we don't care
-          result = doPost(transitionURL, bodydata);
-          
+          try {
+            result = doPost(transitionURL, bodydata);
+          } catch (IOException ex) {
+            logger.println("Unable to connect to REST service to perform transition");
+            logger.print(ex);
+            return;
+          }
+
           if (!result.isValidResult()) {
             logger.println("Could not update status for issue: " + issue.getKey() + ". Cause: " + result.getResultMessage());
           }
         } else {
-          logger.println("Not possible to transtion " + issue.getKey() + " to status " + realWorkflowActionName);
+          logger.println("Not possible to transtion " + issue.getKey() + " to status " + realWorkflowActionName + " because the transition is not possible");
           logger.println("Possible transtions:" + possibleTransition.getTransitions().toString());
         }
-      } catch (IOException e) {
-        logger.println("Could find transitions for issue " + issue.getKey() + ". Cause: " + e.getMessage());
+      } else {
+        logger.println("Unable to find transitions: " + result.getResultMessage());
       }
     }
   }
@@ -138,31 +189,37 @@ public class RESTClient {
    *
    * @param issue The issue to update
    * @param realComment The comment text to add
-   * @throws MalformedURLException
-   * @throws IOException
    */
-  public void addIssueComment(IssueSummary issue, String realComment) throws MalformedURLException, IOException {
+  public void addIssueComment(IssueSummary issue, String realComment) {
 
-    String issuePath = REST_ADD_COMMENT_PATH.replaceAll("\\{issue-key\\}", issue.getKey());
-    URL addCommentURL = new URL(baseAPIUrl + issuePath);
-
+    String issuePath = baseAPIUrl + REST_ADD_COMMENT_PATH.replaceAll("\\{issue-key\\}", issue.getKey());
     if (debug) {
-      logger.println("***Using this URL for adding the comment: " + addCommentURL.toString());
+      logger.println("***Using this URL for adding the comment: " + issuePath);
+    }
+
+    URL addCommentURL;
+    try {
+      addCommentURL = new URL(issuePath);
+    } catch (MalformedURLException ex) {
+      logger.println("Unable to parse URL string " + issuePath);
+      logger.print(ex);
+      return;
     }
 
     if (!realComment.trim().isEmpty()) {
-      try {
-        String bodydata = "{"
-                + "    \"body\": \"" + realComment + "\"\n"
-                + "}";
+      String bodydata = "{\"body\": \"" + realComment + "\"}";
 
-        RestResult result = doPost(addCommentURL, bodydata);
-        
-        if (!result.isValidResult()) {
-          logger.println("Could not set comment " + realComment + " in issue " + issue.getKey() + ". Cause: " + result.getResultMessage());
-        }
-      } catch (IOException e) {
-        logger.println("Could not add message to issue " + issue.getKey() + ". Cause: " + e.getMessage());
+      RestResult result;
+      try {
+        result = doPost(addCommentURL, bodydata);
+      } catch (IOException ex) {
+        logger.println("Unable to connect to REST service to add comment");
+        logger.print(ex);
+        return;
+      }
+
+      if (!result.isValidResult()) {
+        logger.println("Could not set comment " + realComment + " in issue " + issue.getKey() + ". Cause: " + result.getResultMessage());
       }
     }
   }
@@ -173,36 +230,41 @@ public class RESTClient {
    * @param issue
    * @param customFieldId The field we are trying to change
    * @param realFieldValue The new value
-   * @throws MalformedURLException
    */
-  public void updateIssueField(IssueSummary issue, String customFieldId, String realFieldValue) throws MalformedURLException {
-    String setFieldsPath = REST_UPDATE_FIELD_PATH.replaceAll("\\{issue-key\\}", issue.getKey());
-    URL setFieldsURL = new URL(baseAPIUrl + setFieldsPath);
-
+  public void updateIssueField(IssueSummary issue, String customFieldId, String realFieldValue) {
+    String setFieldsPath = baseAPIUrl + REST_UPDATE_FIELD_PATH.replaceAll("\\{issue-key\\}", issue.getKey());
     if (debug) {
-      logger.println("***Using this URL for adding the comment: " + setFieldsURL.toString());
+      logger.println("***Using this URL for adding the comment: " + setFieldsPath);
     }
 
-    if (customFieldId != null && !customFieldId.trim().isEmpty()) {
-      try {
-        String bodydata = "{\n"
-                + "    \"fields\": {\n"
-                + "        \"" + customFieldId + "\": \"" + realFieldValue + "\"\n"
-                + "    }\n"
-                + "}";
+    URL setFieldsURL;
+    try {
+      setFieldsURL = new URL(setFieldsPath);
+    } catch (MalformedURLException ex) {
+      logger.println("Unable to parse URL string " + setFieldsPath);
+      logger.print(ex);
+      return;
+    }
 
-        RestResult result = doPut(setFieldsURL, bodydata);
-        
-        if (!result.isValidResult()) {
-          logger.println("Could not set field " + customFieldId + " in issue " + issue.getKey() + ". Cause: " + result.getResultMessage());
-        }
-      } catch (IOException e) {
-        logger.println("Could not set field " + customFieldId + " in issue " + issue.getKey() + ". Cause: " + e.getMessage());
+    if (!customFieldId.trim().isEmpty()) {
+      String bodydata = "{\"fields\": {\"" + customFieldId + "\": \"" + realFieldValue + "\"}}";
+
+      RestResult result;
+      try {
+        result = doPut(setFieldsURL, bodydata);
+      } catch (IOException ex) {
+        logger.println("Unable to connect to REST service to set field ");
+        logger.print(ex);
+        return;
+      }
+
+      if (!result.isValidResult()) {
+        logger.println("Could not set field " + customFieldId + " in issue " + issue.getKey() + ". Cause: " + result.getResultMessage());
       }
     }
   }
 
-//  private void updateFixedVersions(SOAPClient client, SOAPSession session, RemoteIssue issue, PrintStream logger) {
+//  private void updateFixedVersions(IssueSummary issue, PrintStream logger) {
 //    // NOT resettingFixedVersions and EMPTY fixedVersionNames: do not need to update the issue,
 //    // otherwise:
 //    if (resettingFixedVersions || !fixedVersionNames.isEmpty()) {
@@ -228,28 +290,29 @@ public class RESTClient {
 //      }
 //    }
 //  }
-  /**
-   * Converts version names to IDs for the specified project. Non-existent
-   * versions are ignored, error messages are logged.
-   * <p>
-   * The jira soap api needs <code>ID</code>s of the fixed versions instead the
-   * human readable <code>name</code>s. The (fixed) versions are project
-   * specific. Since the issues found by <code>jql</code> do not necessarily
-   * belong to the same jira project. the versions must be retrieved for every
-   * single issue. In some cases, however, the issues do belong to the same
-   * project, so the Soap call to get versions may well be redundant. Those
-   * unnecessary soap calls may cause performance problem if number of issues is
-   * large. {@link #projectVersionNameIdCache} as a primitive cache, is intended
-   * to improve the situation (could this cause concurrent issues?).
-   * </p>
-   *
-   * @param session
-   * @param projectKey	key of the project
-   * @param versionNames	a collection of human readable jira version names (jira
-   * built-in or configured per project)
-   * @return	corresponding jira version ids
-   */
-//  private Collection<String> mapFixedVersionNamesToIds(SOAPClient client, SOAPSession session, String projectKey, Collection<String> versionNames, PrintStream logger) {
+//  
+//  /**
+//   * Converts version names to IDs for the specified project. Non-existent
+//   * versions are ignored, error messages are logged.
+//   * <p>
+//   * The jira soap api needs <code>ID</code>s of the fixed versions instead the
+//   * human readable <code>name</code>s. The (fixed) versions are project
+//   * specific. Since the issues found by <code>jql</code> do not necessarily
+//   * belong to the same jira project. the versions must be retrieved for every
+//   * single issue. In some cases, however, the issues do belong to the same
+//   * project, so the Soap call to get versions may well be redundant. Those
+//   * unnecessary soap calls may cause performance problem if number of issues is
+//   * large. {@link #projectVersionNameIdCache} as a primitive cache, is intended
+//   * to improve the situation (could this cause concurrent issues?).
+//   * </p>
+//   *
+//   * @param session
+//   * @param projectKey	key of the project
+//   * @param versionNames	a collection of human readable jira version names (jira
+//   * built-in or configured per project)
+//   * @return	corresponding jira version ids
+//   */
+//  private Collection<String> mapFixedVersionNamesToIds(String projectKey, Collection<String> versionNames, PrintStream logger) {
 //    // lazy fetching project versions and initializing the name-id map for the versions if necessary
 //    Map<String, String> map = projectVersionNameIdCache.get(projectKey);
 //    if (map == null) {
@@ -285,6 +348,7 @@ public class RESTClient {
 //    }
 //    return ids;
 //  }
+  
   // ---------------------------------------------------------------------------
   // Generic REST call implementations
   // ---------------------------------------------------------------------------
@@ -299,7 +363,7 @@ public class RESTClient {
   private RestResult doGet(URL url) throws IOException {
 
     RestResult result = new RestResult();
-    
+
     HttpURLConnection conn = (HttpURLConnection) url.openConnection();
     conn.setRequestMethod("GET");
     conn.setRequestProperty("Accept", "application/json");
@@ -317,7 +381,7 @@ public class RESTClient {
 
     result.setResultCode(conn.getResponseCode());
     result.setResultMessage(output.toString());
-    
+
     if ((conn.getResponseCode() == 200) || (conn.getResponseCode() == 201)) {
       result.setValidResult(true);
     }
@@ -339,7 +403,7 @@ public class RESTClient {
   private RestResult doPost(URL url, String bodydata) throws IOException {
 
     RestResult result = new RestResult();
-    
+
     byte[] postDataBytes = bodydata.getBytes("UTF-8");
 
     HttpURLConnection conn = (HttpURLConnection) url.openConnection();
@@ -365,11 +429,11 @@ public class RESTClient {
 
     result.setResultCode(conn.getResponseCode());
     result.setResultMessage(output.toString());
-    
+
     if ((conn.getResponseCode() == 200) || (conn.getResponseCode() == 201)) {
       result.setValidResult(true);
     }
-    
+
     conn.disconnect();
 
     return result;
@@ -412,11 +476,11 @@ public class RESTClient {
 
     result.setResultCode(conn.getResponseCode());
     result.setResultMessage(output.toString());
-    
+
     if ((conn.getResponseCode() == 200) || (conn.getResponseCode() == 204)) {
       result.setValidResult(true);
     }
-    
+
     conn.disconnect();
 
     return result;
