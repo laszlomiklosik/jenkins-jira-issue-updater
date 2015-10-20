@@ -16,8 +16,4 @@ public class IssueUpdaterBuildAction extends InvisibleAction implements Action {
 
   IssueUpdaterBuildAction(AbstractProject<?, ?> project) {
   }
-	
-	public String getLinkFor(String fitnessePage) {
-		return fitnessePage;
-	}
 }

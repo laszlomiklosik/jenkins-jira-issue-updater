@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintStream;
+import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -35,13 +36,18 @@ public class RESTClient {
   private final String password;
   private final PrintStream logger;
   private final boolean debug = false;
+  private final String basicAuthToken;
 
   // Constructor - set up required information
-  public RESTClient(String baseAPIUrl, String userName, String password, PrintStream logger) {
+  public RESTClient(String baseAPIUrl, String userName, String password, PrintStream logger) throws UnsupportedEncodingException {
     this.baseAPIUrl = baseAPIUrl;
     this.userName = userName;
     this.password = password;
     this.logger = logger;
+    
+    String rawAuth = userName + ":" + password;
+    Base64Encoder encoder = new Base64Encoder();
+    basicAuthToken = "Basic " + encoder.encode(rawAuth.getBytes("UTF-8"));
   }
 
   /**
@@ -71,7 +77,7 @@ public class RESTClient {
             + "    ]\n"
             + "}";
 
-    RestResult result = doPost(findIssueURL, userName, password, bodydata);
+    RestResult result = doPost(findIssueURL, bodydata);
 
     ObjectMapper mapper = new ObjectMapper();
     IssueSummaryList summaryList = mapper.readValue(result.getResultMessage(), IssueSummaryList.class);
@@ -98,7 +104,7 @@ public class RESTClient {
 
       // See if the issue can transition to the given status, and transition
       try {
-        RestResult result = doGet(transitionURL, userName, password);
+        RestResult result = doGet(transitionURL);
 
         ObjectMapper mapper = new ObjectMapper();
         mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
@@ -112,7 +118,7 @@ public class RESTClient {
                   + "}";
 
           // There is a result, but we don't care
-          result = doPost(transitionURL, userName, password, bodydata);
+          result = doPost(transitionURL, bodydata);
           
           if (!result.isValidResult()) {
             logger.println("Could not update status for issue: " + issue.getKey() + ". Cause: " + result.getResultMessage());
@@ -150,7 +156,7 @@ public class RESTClient {
                 + "    \"body\": \"" + realComment + "\"\n"
                 + "}";
 
-        RestResult result = doPost(addCommentURL, userName, password, bodydata);
+        RestResult result = doPost(addCommentURL, bodydata);
         
         if (!result.isValidResult()) {
           logger.println("Could not set comment " + realComment + " in issue " + issue.getKey() + ". Cause: " + result.getResultMessage());
@@ -185,7 +191,7 @@ public class RESTClient {
                 + "    }\n"
                 + "}";
 
-        RestResult result = doPut(setFieldsURL, userName, password, bodydata);
+        RestResult result = doPut(setFieldsURL, bodydata);
         
         if (!result.isValidResult()) {
           logger.println("Could not set field " + customFieldId + " in issue " + issue.getKey() + ". Cause: " + result.getResultMessage());
@@ -287,19 +293,13 @@ public class RESTClient {
    * if the result code is 200 or 201.
    *
    * @param url The full REST URL to use
-   * @param userName The user name to use
-   * @param password The password to use
    * @return The REST response
    * @throws IOException
    */
-  private RestResult doGet(URL url, String userName, String password) throws IOException {
+  private RestResult doGet(URL url) throws IOException {
 
     RestResult result = new RestResult();
     
-    String rawAuth = userName + ":" + password;
-    Base64Encoder encoder = new Base64Encoder();
-    String basicAuthToken = "Basic " + encoder.encode(rawAuth.getBytes("UTF-8"));
-
     HttpURLConnection conn = (HttpURLConnection) url.openConnection();
     conn.setRequestMethod("GET");
     conn.setRequestProperty("Accept", "application/json");
@@ -332,21 +332,15 @@ public class RESTClient {
    * Deemed success if the result code is 200 or 201.
    *
    * @param url The full REST URL to use
-   * @param userName The user name to use
-   * @param password The password to use
    * @param bodydata The post body we are using
    * @return The REST response
    * @throws IOException
    */
-  private RestResult doPost(URL url, String userName, String password, String bodydata) throws IOException {
+  private RestResult doPost(URL url, String bodydata) throws IOException {
 
     RestResult result = new RestResult();
     
     byte[] postDataBytes = bodydata.getBytes("UTF-8");
-
-    String rawAuth = userName + ":" + password;
-    Base64Encoder encoder = new Base64Encoder();
-    String basicAuthToken = "Basic " + encoder.encode(rawAuth.getBytes("UTF-8"));
 
     HttpURLConnection conn = (HttpURLConnection) url.openConnection();
     conn.setRequestMethod("POST");
@@ -386,20 +380,14 @@ public class RESTClient {
    * success if the result code is 200 or 204.
    *
    * @param url The full REST URL to use
-   * @param userName The user name to use
-   * @param password The password to use
    * @param bodydata The post body we are using
    * @return The REST response
    * @throws IOException
    */
-  private RestResult doPut(URL url, String userName, String password, String bodydata) throws IOException {
+  private RestResult doPut(URL url, String bodydata) throws IOException {
 
     RestResult result = new RestResult();
     byte[] postDataBytes = bodydata.getBytes("UTF-8");
-
-    String rawAuth = userName + ":" + password;
-    Base64Encoder encoder = new Base64Encoder();
-    String basicAuthToken = "Basic " + encoder.encode(rawAuth.getBytes("UTF-8"));
 
     HttpURLConnection conn = (HttpURLConnection) url.openConnection();
     conn.setRequestMethod("PUT");

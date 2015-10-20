@@ -46,10 +46,7 @@ public class IssueUpdatesBuilder extends Builder {
   private static final String BUILD_PARAMETER_PREFIX = "$";
   private static final String HTTP_PROTOCOL_PREFIX = "http://";
   private static final String HTTPS_PROTOCOL_PREFIX = "https://";
-  // Delimiter separates fixed versions
-  private static final String DELIMITER = ",";
-
-  static final String _LOCALHOST = "localhost";
+  private static final String FIXED_VERSIONS_LIST_DELIMITER = ",";
 
   private final String restAPIUrl;
   private final String userName;
@@ -361,7 +358,7 @@ public class IssueUpdatesBuilder extends Builder {
       realFieldValue = substituteEnvVar(realFieldValue, entry.getKey(), entry.getValue());
       expandedFixedVersions = substituteEnvVar(expandedFixedVersions, entry.getKey(), entry.getValue());
     }
-    fixedVersionNames = Arrays.asList(expandedFixedVersions.trim().split(IssueUpdatesBuilder.DELIMITER));
+    fixedVersionNames = Arrays.asList(expandedFixedVersions.trim().split(FIXED_VERSIONS_LIST_DELIMITER));
   }
 
   /**

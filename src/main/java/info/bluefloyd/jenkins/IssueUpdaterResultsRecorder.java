@@ -42,13 +42,7 @@ public class IssueUpdaterResultsRecorder extends Recorder {
   private static final String BUILD_PARAMETER_PREFIX = "$";
   private static final String HTTP_PROTOCOL_PREFIX = "http://";
   private static final String HTTPS_PROTOCOL_PREFIX = "https://";
-  // Delimiter separates fixed versions
-  private static final String DELIMITER = ",";
-
-  // REST paths for the calls we want to make - suffixed onto the "restAPIUrl
-  private static final String REST_SEARCH_PATH = "/search?jql";
-  private static final String REST_ADD_COMMENT_PATH = "/issue/{issue-key}/comment";
-  static final String _LOCALHOST = "localhost";
+  private static final String FIXED_VERSIONS_LIST_DELIMITER = ",";
 
   private final String restAPIUrl;
   private final String userName;
@@ -390,8 +384,6 @@ public class IssueUpdaterResultsRecorder extends Recorder {
     realComment = comment;
     realFieldValue = customFieldValue;
     String expandedFixedVersions = fixedVersions == null ? "" : fixedVersions.trim();
-
-    // build parameter substitution
     for (Map.Entry<String, String> entry : vars.entrySet()) {
       realJql = substituteEnvVar(realJql, entry.getKey(), entry.getValue());
       realWorkflowActionName = substituteEnvVar(realWorkflowActionName, entry.getKey(), entry.getValue());
@@ -399,8 +391,7 @@ public class IssueUpdaterResultsRecorder extends Recorder {
       realFieldValue = substituteEnvVar(realFieldValue, entry.getKey(), entry.getValue());
       expandedFixedVersions = substituteEnvVar(expandedFixedVersions, entry.getKey(), entry.getValue());
     }
-    // NOTE: did not trim
-    fixedVersionNames = Arrays.asList(expandedFixedVersions.trim().split(DELIMITER));
+    fixedVersionNames = Arrays.asList(expandedFixedVersions.trim().split(FIXED_VERSIONS_LIST_DELIMITER));
   }
 
   String substituteEnvVar(String origin, String varName, String replacement) {
