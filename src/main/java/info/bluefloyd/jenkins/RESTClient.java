@@ -16,8 +16,6 @@ import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * Simple generic REST client based on native HTTP. Also contains a logic layer
@@ -84,7 +82,8 @@ public class RESTClient {
             + "    \"startAt\": 0,\n"
             + "    \"maxResults\": 10000,\n"
             + "    \"fields\": [\n"
-            + "        \"summary\"\n"
+            + "        \"summary\",\n"
+            + "        \"versions\"\n"
             + "    ]\n"
             + "}";
 
@@ -110,7 +109,7 @@ public class RESTClient {
 
       return summaryList;
     } else {
-      logger.println("Unable to find issues: " + result.getResultMessage());
+      logger.println("Unable to find issues: (" + result.getResultCode() + ") " + result.getResultMessage());
       return null;
     }
   }
@@ -172,14 +171,14 @@ public class RESTClient {
           }
 
           if (!result.isValidResult()) {
-            logger.println("Could not update status for issue: " + issue.getKey() + ". Cause: " + result.getResultMessage());
+            logger.println("Could not update status for issue: " + issue.getKey() + " (" + result.getResultCode() + ") " + result.getResultMessage());
           }
         } else {
           logger.println("Not possible to transtion " + issue.getKey() + " to status " + realWorkflowActionName + " because the transition is not possible");
           logger.println("Possible transtions:" + possibleTransition.getTransitions().toString());
         }
       } else {
-        logger.println("Unable to find transitions: " + result.getResultMessage());
+        logger.println("Unable to find transitions: (" + result.getResultCode() + ")" + result.getResultMessage());
       }
     }
   }
@@ -219,7 +218,7 @@ public class RESTClient {
       }
 
       if (!result.isValidResult()) {
-        logger.println("Could not set comment " + realComment + " in issue " + issue.getKey() + ". Cause: " + result.getResultMessage());
+        logger.println("Could not set comment " + realComment + " in issue " + issue.getKey() + " (" + result.getResultCode() + ") " + result.getResultMessage());
       }
     }
   }
@@ -259,7 +258,7 @@ public class RESTClient {
       }
 
       if (!result.isValidResult()) {
-        logger.println("Could not set field " + customFieldId + " in issue " + issue.getKey() + ". Cause: " + result.getResultMessage());
+        logger.println("Could not set field " + customFieldId + " in issue " + issue.getKey() + " (" + result.getResultCode() + ") " + result.getResultMessage());
       }
     }
   }

@@ -200,6 +200,10 @@ public class IssueUpdatesBuilder extends Builder {
     // reset the cache
     projectVersionNameIdCache = new ConcurrentHashMap<String, Map<String, String>>();
 
+    if (!fixedVersions.isEmpty()) {
+      fixedVersionNames = Arrays.asList(fixedVersions.split(FIXED_VERSIONS_LIST_DELIMITER));
+    }
+
     // Perform the actions on each found JIRA
     if (issueSummary.getIssues() != null) {
       for (IssueSummary issue : issueSummary.getIssues()) {
@@ -207,7 +211,7 @@ public class IssueUpdatesBuilder extends Builder {
         client.updateIssueStatus(issue, realWorkflowActionName);
         client.addIssueComment(issue, realComment);
         client.updateIssueField(issue, customFieldId, realFieldValue);
-        //updateFixedVersions(client, session, issue, logger);
+        //client.updateFixedVersions(issue, fixedVersionNames, resettingFixedVersions, logger);
       }
     }
     return true;
