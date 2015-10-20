@@ -1,96 +1,65 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
-	<modelVersion>4.0.0</modelVersion>
-	<groupId>info.bluefloyd.jenkins</groupId>
-	<artifactId>jenkins-jira-issue-updater</artifactId>
-	<version>1.1-SNAPSHOT</version>
-	<packaging>hpi</packaging>
-	<name>Jenkins Jira Issue Updater</name>
-	<description>Jenkins plugin which can update Jira issues in a maven or a freestyle job.</description>
-	<url>https://wiki.jenkins-ci.org/display/JENKINS/Jira+Issue+Updater+Plugin</url>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>info.bluefloyd.jenkins</groupId>
+  <artifactId>jenkins-jira-issue-updater</artifactId>
+  <version>1.15.1.2</version>
+  <packaging>hpi</packaging>
+  <name>Jenkins Jira Issue Updater</name>
+  <description>Jenkins plugin which can update Jira issues in a maven or a freestyle job.</description>
+  <url>https://wiki.jenkins-ci.org/display/JENKINS/Jira+Issue+Updater+Plugin</url>
 
-	<parent>
-		<groupId>org.jenkins-ci.plugins</groupId>
-		<artifactId>plugin</artifactId>
-		<version>1.437</version>
-	</parent>
+  <parent>
+    <groupId>org.jenkins-ci.plugins</groupId>
+    <artifactId>plugin</artifactId>
+    <version>1.600</version>
+  </parent>
 
-	<dependencies>
-		<dependency>
-			<groupId>axis</groupId>
-			<artifactId>axis</artifactId>
-			<version>1.3</version>
-		</dependency>
-		<dependency>
-			<groupId>axis</groupId>
-			<artifactId>axis-jaxrpc</artifactId>
-			<version>1.3</version>
-		</dependency>
-		<dependency>
-			<groupId>axis</groupId>
-			<artifactId>axis-saaj</artifactId>
-			<version>1.3</version>
-		</dependency>
-		<dependency>
-			<groupId>axis</groupId>
-			<artifactId>axis-wsdl4j</artifactId>
-			<version>1.5.1</version>
-		</dependency>
-		<dependency>
-			<groupId>javax.mail</groupId>
-			<artifactId>javax.mail-api</artifactId>
-			<version>1.4.4</version>
-		</dependency>
-	</dependencies>
+  <dependencies>
+    <dependency>
+      <groupId>axis</groupId>
+      <artifactId>axis</artifactId>
+      <version>1.3</version>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+      <version>2.6.1</version>
+      <type>jar</type>
+    </dependency>
+  </dependencies>
 
-	<build>
-		<plugins>
-			<plugin>
-				<groupId>org.codehaus.mojo</groupId>
-				<artifactId>axistools-maven-plugin</artifactId>
-				<version>1.3</version>
-				<dependencies>
-					<dependency>
-						<groupId>axis</groupId>
-						<artifactId>axis</artifactId>
-						<version>1.3</version>
-					</dependency>
-					<dependency>
-						<groupId>javax.mail</groupId>
-						<artifactId>javax.mail-api</artifactId>
-						<version>1.4.4</version>
-					</dependency>
-				</dependencies>
-				<configuration>
-					<wsdlFiles>
-						<wsdlFile>jirasoapservice-v2.wsdl</wsdlFile>
-					</wsdlFiles>
-					<packageSpace>com.atlassian.jira.rpc.soap.client</packageSpace>
-				</configuration>
-				<executions>
-					<execution>
-						<id>wsdl2java-generation</id>
-						<phase>generate-sources</phase>
-						<goals>
-							<goal>wsdl2java</goal>
-						</goals>
-					</execution>
-				</executions>
-			</plugin>
-		</plugins>
-	</build>
+  <scm>
+    <connection>scm:git:ssh://github.com/jenkinsci/jira-issue-updater-plugin.git</connection>  	
+    <developerConnection>scm:git:ssh://git@github.com/jenkinsci/jira-issue-updater-plugin.git</developerConnection>
+    <url>https://github.com/jenkinsci/jira-issue-updater-plugin</url>
+  </scm>
 
-	<scm>
-		<connection>scm:git:git://github.com/laszlomiklosik/jenkins-jira-issue-updater.git</connection>
-		<developerConnection>scm:git:git@github.com:laszlomiklosik/jenkins-jira-issue-updater.git</developerConnection>
-		<url>https://github.com/laszlomiklosik/jenkins-jira-issue-updater</url>
-	</scm>
+  <developers>
+    <developer>
+      <id>laszlomiklosik</id>
+      <name>Laszlo Miklosik</name>
+      <email>laszlo.miklosik@gmail.com</email>
+    </developer>
+    <developer>
+      <id>isparkes</id>
+      <name>Ian Sparkes</name>
+      <email>ian.sparks@swisscom.com</email>
+    </developer>
+  </developers>
 
-	<developers>
-		<developer>
-			<id>laszlomiklosik</id>
-			<name>Laszlo Miklosik</name>
-			<email>laszlo.miklosik@gmail.com</email>
-		</developer>
-	</developers>
-</project>
+  <repositories>
+    <repository>
+      <id>repo.jenkins-ci.org</id>
+      <url>http://repo.jenkins-ci.org/public/</url>
+    </repository>
+  </repositories>
+
+  <pluginRepositories>
+    <pluginRepository>
+      <id>repo.jenkins-ci.org</id>
+      <url>http://repo.jenkins-ci.org/public/</url>
+    </pluginRepository>
+  </pluginRepositories>
+</project>  
+  
+

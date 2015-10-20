@@ -7,7 +7,7 @@
   xmlns:t="/lib/hudson" 
   xmlns:f="/lib/form"
   xmlns:i="jelly:fmt">
-
+  
   <!--
     This jelly script is used for per-project configuration.
 
@@ -45,7 +45,7 @@
   <f:entry title="Jira custom field value" field="customFieldValue">
     <f:textbox />
   </f:entry>
-
+  
 <!-- Not yet Implemented, sorry...
 
   <f:entry title="Remove existing fixed versions first" field="resettingFixedVersions">
@@ -59,9 +59,9 @@
   <f:entry title="Fixed versions to be added (delimited by comma)" field="fixedVersions">
     <f:textbox />
   </f:entry>
-  
-  -->
 
+  -->
+  
   <f:entry title="Fail this build if JQL returns error" field="failIfJqlFails">
     <f:checkbox />
   </f:entry>
