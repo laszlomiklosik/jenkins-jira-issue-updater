@@ -10,7 +10,7 @@ import java.util.List;
  */
 public class FieldSummary {
   private String summary;
-  private List<String> versions;
+  private List<VersionSummary> versions;
 
   /**
    * @return the summary
@@ -29,14 +29,14 @@ public class FieldSummary {
   /**
    * @return the versions
    */
-  public List<String> getVersions() {
+  public List<VersionSummary> getVersions() {
     return versions;
   }
 
   /**
    * @param versions the versions to set
    */
-  public void setVersions(List<String> versions) {
+  public void setVersions(List<VersionSummary> versions) {
     this.versions = versions;
   }
 
