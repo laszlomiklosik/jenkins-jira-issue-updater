@@ -15,8 +15,11 @@ import hudson.tasks.Recorder;
 import hudson.util.FormValidation;
 import info.bluefloyd.jira.model.IssueSummary;
 import info.bluefloyd.jira.model.IssueSummaryList;
+
+import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -27,6 +30,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.servlet.ServletException;
+
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang.StringUtils;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
 
@@ -50,6 +56,7 @@ public class IssueUpdaterResultsRecorder extends Recorder {
   private final String jql;
   private final String workflowActionName;
   private final String comment;
+  private final String commentFile;
   private final String customFieldId;
   private final String customFieldValue;
   private final boolean resettingFixedVersions;
@@ -75,7 +82,7 @@ public class IssueUpdaterResultsRecorder extends Recorder {
 
   @DataBoundConstructor
   public IssueUpdaterResultsRecorder(String restAPIUrl, String userName, String password, String jql, String workflowActionName,
-          String comment, String customFieldId, String customFieldValue, boolean resettingFixedVersions,
+          String comment, String commentFile, String customFieldId, String customFieldValue, boolean resettingFixedVersions,
           boolean createNonExistingFixedVersions, String fixedVersions, boolean failIfJqlFails,
           boolean failIfNoIssuesReturned, boolean failIfNoJiraConnection) {
     this.restAPIUrl = restAPIUrl;
@@ -84,6 +91,7 @@ public class IssueUpdaterResultsRecorder extends Recorder {
     this.jql = jql;
     this.workflowActionName = workflowActionName;
     this.comment = comment;
+    this.commentFile = commentFile;
     this.customFieldId = customFieldId;
     this.customFieldValue = customFieldValue;
     this.resettingFixedVersions = resettingFixedVersions;
@@ -138,7 +146,7 @@ public class IssueUpdaterResultsRecorder extends Recorder {
     Map<String, String> vars = new HashMap<String, String>();
     vars.putAll(build.getEnvironment(listener));
     vars.putAll(build.getBuildVariables());
-    substituteEnvVars(vars);
+    substituteEnvVars(vars, logger);
 
     RESTClient client = new RESTClient(getRestAPIUrl(),getUserName(), getPassword(),logger);
     
@@ -340,6 +348,13 @@ public class IssueUpdaterResultsRecorder extends Recorder {
     return comment;
   }
 
+  /**
+   * @return the comment filename
+   */
+  public String getCommentFile() {
+    return commentFile;
+  }
+
   public String getCustomFieldId() {
     return customFieldId;
   }
@@ -367,11 +382,33 @@ public class IssueUpdaterResultsRecorder extends Recorder {
   public boolean isFailIfNoJiraConnection() {
     return failIfNoJiraConnection;
   }
-  
+
+  @Deprecated
   void substituteEnvVars(Map<String, String> vars) {
+    substituteEnvVars(vars, null);
+  }
+
+  void substituteEnvVars(Map<String, String> vars, PrintStream logger) {
     realJql = jql;
     realWorkflowActionName = workflowActionName;
-    realComment = comment;
+    try {
+      if (StringUtils.isEmpty(commentFile)) {
+        realComment = comment;
+      } else {
+        String realCommentFile = commentFile;
+        for (Map.Entry<String, String> entry : vars.entrySet()) {
+          realCommentFile = substituteEnvVar(realCommentFile, entry.getKey(), entry.getValue());
+        }
+        realComment = FileUtils.readFileToString(new File(realCommentFile), "utf-8");
+      }
+    } catch (IOException e) {
+      realComment = comment;
+      if (logger != null) {
+        logger.println(e.getMessage());
+      } else {
+        System.out.println(e.getMessage());
+      }
+    }
     realFieldValue = customFieldValue;
     String expandedFixedVersions = fixedVersions == null ? "" : fixedVersions.trim();
     for (Map.Entry<String, String> entry : vars.entrySet()) {
