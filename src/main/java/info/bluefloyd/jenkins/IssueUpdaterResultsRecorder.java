@@ -9,6 +9,7 @@ import info.bluefloyd.jira.model.IssueSummary;
 import info.bluefloyd.jira.model.IssueSummaryList;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringEscapeUtils;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
 
@@ -388,11 +389,7 @@ public class IssueUpdaterResultsRecorder extends Recorder {
       }
     } catch (IOException e) {
       realComment = comment;
-      if (logger != null) {
-        logger.println(e.getMessage());
-      } else {
-        System.out.println(e.getMessage());
-      }
+      (logger != null ? logger : System.out).println(e);
     }
     realFieldValue = customFieldValue;
     String expandedFixedVersions = fixedVersions == null ? "" : fixedVersions.trim();
@@ -404,6 +401,8 @@ public class IssueUpdaterResultsRecorder extends Recorder {
       expandedFixedVersions = substituteEnvVar(expandedFixedVersions, entry.getKey(), entry.getValue());
     }
     fixedVersionNames = Arrays.asList(expandedFixedVersions.trim().split(FIXED_VERSIONS_LIST_DELIMITER));
+    (logger != null ? logger : System.out).println("realComment: \n" + realComment);
+    realComment = StringEscapeUtils.escapeJson(realComment);
   }
 
   String substituteEnvVar(String origin, String varName, String replacement) {
