@@ -2,13 +2,23 @@ package info.bluefloyd.jenkins;
 
 import hudson.Extension;
 import hudson.Launcher;
-import hudson.model.BuildListener;
 import hudson.model.AbstractBuild;
 import hudson.model.AbstractProject;
+import hudson.model.BuildListener;
 import hudson.tasks.BuildStepDescriptor;
 import hudson.tasks.Builder;
 import hudson.util.FormValidation;
+import info.bluefloyd.jira.model.IssueSummary;
+import info.bluefloyd.jira.model.IssueSummaryList;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringEscapeUtils;
+import org.kohsuke.stapler.DataBoundConstructor;
+import org.kohsuke.stapler.QueryParameter;
+import org.kohsuke.stapler.StaplerRequest;
 
+import javax.servlet.ServletException;
+import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.util.Arrays;
@@ -18,22 +28,16 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import javax.servlet.ServletException;
-import org.kohsuke.stapler.DataBoundConstructor;
-import org.kohsuke.stapler.QueryParameter;
-import org.kohsuke.stapler.StaplerRequest;
-import info.bluefloyd.jira.model.IssueSummary;
-import info.bluefloyd.jira.model.IssueSummaryList;
 
 /**
- * <p>
+ * <p/>
  * When the user configures the project and enables this builder,
  * {@link DescriptorImpl#newInstance(StaplerRequest)} is invoked and a new
  * {@link IssueUpdatesBuilder} is created. The created instance is persisted to
  * the project configuration XML by using XStream, so this allows you to use
  * instance fields (like {@link #name}) to remember the configuration.
- *
- * <p>
+ * <p/>
+ * <p/>
  * When a build is performed, the
  * {@link #perform(AbstractBuild, Launcher, BuildListener)} method will be
  * invoked.
@@ -54,6 +58,7 @@ public class IssueUpdatesBuilder extends Builder {
   private final String jql;
   private final String workflowActionName;
   private final String comment;
+  private final String commentFile;
   private final String customFieldId;
   private final String customFieldValue;
   private String realJql;
@@ -72,21 +77,22 @@ public class IssueUpdatesBuilder extends Builder {
 
   // Temporarily cache the version String-ID mapping for multiple
   // projects, to avoid performance penalty may be caused by excessive
-  // getVersions() invocations.  
+  // getVersions() invocations.
   // Map<ProjectKey, Map<VersionName, VersionID>>
   transient Map<String, Map<String, String>> projectVersionNameIdCache;
 
   @DataBoundConstructor
   public IssueUpdatesBuilder(String restAPIUrl, String userName, String password, String jql, String workflowActionName,
-          String comment, String customFieldId, String customFieldValue, boolean resettingFixedVersions,
-          boolean createNonExistingFixedVersions, String fixedVersions, boolean failIfJqlFails,
-          boolean failIfNoIssuesReturned, boolean failIfNoJiraConnection) {
+                             String comment, String commentFile, String customFieldId, String customFieldValue, boolean resettingFixedVersions,
+                             boolean createNonExistingFixedVersions, String fixedVersions, boolean failIfJqlFails,
+                             boolean failIfNoIssuesReturned, boolean failIfNoJiraConnection) {
     this.restAPIUrl = restAPIUrl;
     this.userName = userName;
     this.password = password;
     this.jql = jql;
     this.workflowActionName = workflowActionName;
     this.comment = comment;
+    this.commentFile = commentFile;
     this.customFieldId = customFieldId;
     this.customFieldValue = customFieldValue;
     this.resettingFixedVersions = resettingFixedVersions;
@@ -139,6 +145,13 @@ public class IssueUpdatesBuilder extends Builder {
     return comment;
   }
 
+  /**
+   * @return the comment filename
+   */
+  public String getCommentFile() {
+    return commentFile;
+  }
+
   public String getCustomFieldId() {
     return customFieldId;
   }
@@ -177,10 +190,10 @@ public class IssueUpdatesBuilder extends Builder {
     Map<String, String> vars = new HashMap<String, String>();
     vars.putAll(build.getEnvironment(listener));
     vars.putAll(build.getBuildVariables());
-    substituteEnvVars(vars);
+    substituteEnvVars(vars, logger);
 
-    RESTClient client = new RESTClient(getRestAPIUrl(),getUserName(), getPassword(),logger);
-    
+    RESTClient client = new RESTClient(getRestAPIUrl(), getUserName(), getPassword(), logger);
+
     // Find the list of issues we are interested in, maximum of 10000
     IssueSummaryList issueSummary = client.findIssuesByJQL(realJql);
     if (issueSummary == null) {
@@ -196,7 +209,7 @@ public class IssueUpdatesBuilder extends Builder {
         return true;
       }
     }
-    
+
     // reset the cache
     projectVersionNameIdCache = new ConcurrentHashMap<String, Map<String, String>>();
 
@@ -216,7 +229,7 @@ public class IssueUpdatesBuilder extends Builder {
     }
     return true;
   }
-  
+
   @Override
   public DescriptorImpl getDescriptor() {
     return (DescriptorImpl) super.getDescriptor();
@@ -225,8 +238,8 @@ public class IssueUpdatesBuilder extends Builder {
   /**
    * Descriptor for {@link IssueUpdatesBuilder}. Used as a singleton. The class
    * is marked as public so that it can be accessed from views.
-   *
-   * <p>
+   * <p/>
+   * <p/>
    * See <tt>src/main/resources/jenkins/JiraIssueUpdatesBuilder/*.jelly</tt>
    * for the actual HTML fragment for the configuration screen.
    */
@@ -303,11 +316,11 @@ public class IssueUpdatesBuilder extends Builder {
       }
       if (!value.toLowerCase().contains("project=")) {
         return FormValidation
-                .warning("Is a project mentioned in the JQL? Using \"project=\" is recommended to select a the issues from a given project.");
+            .warning("Is a project mentioned in the JQL? Using \"project=\" is recommended to select a the issues from a given project.");
       }
       if (!value.toLowerCase().contains("status=")) {
         return FormValidation
-                .warning("Is an issue status mentioned in the JQL? Using \"status=\" is recommended to select the issues by status.");
+            .warning("Is an issue status mentioned in the JQL? Using \"status=\" is recommended to select the issues by status.");
       }
       return FormValidation.ok();
     }
@@ -328,17 +341,41 @@ public class IssueUpdatesBuilder extends Builder {
       return "Jira Issue Updater";
     }
   }
-  
-  
+
+
   /**
    * Replace variable place holders with values from environment variables.
    *
    * @param vars The map of environment variables we have
    */
+  @Deprecated
   void substituteEnvVars(Map<String, String> vars) {
+    substituteEnvVars(vars, null);
+  }
+
+  /**
+   * Replace variable place holders with values from environment variables.
+   *
+   * @param vars   The map of environment variables we have
+   * @param logger Work logger
+   */
+  void substituteEnvVars(Map<String, String> vars, PrintStream logger) {
     realJql = jql;
     realWorkflowActionName = workflowActionName;
-    realComment = comment;
+    try {
+      if (StringUtils.isEmpty(commentFile)) {
+        realComment = comment;
+      } else {
+        String realCommentFile = commentFile;
+        for (Map.Entry<String, String> entry : vars.entrySet()) {
+          realCommentFile = substituteEnvVar(realCommentFile, entry.getKey(), entry.getValue());
+        }
+        realComment = FileUtils.readFileToString(new File(realCommentFile), "utf-8");
+      }
+    } catch (IOException e) {
+      realComment = comment;
+      (logger != null ? logger : System.out).println(e);
+    }
     realFieldValue = customFieldValue;
     String expandedFixedVersions = fixedVersions == null ? "" : fixedVersions.trim();
     for (Map.Entry<String, String> entry : vars.entrySet()) {
@@ -349,13 +386,15 @@ public class IssueUpdatesBuilder extends Builder {
       expandedFixedVersions = substituteEnvVar(expandedFixedVersions, entry.getKey(), entry.getValue());
     }
     fixedVersionNames = Arrays.asList(expandedFixedVersions.trim().split(FIXED_VERSIONS_LIST_DELIMITER));
+    (logger != null ? logger : System.out).println("realComment: \n" + realComment);
+    realComment = StringEscapeUtils.escapeJson(realComment);
   }
 
   /**
    * Replace a single environment variable in a single string
    *
-   * @param origin The string containing place holders
-   * @param varName The placeholder tag
+   * @param origin      The string containing place holders
+   * @param varName     The placeholder tag
    * @param replacement The value to replace it with, if found
    * @return The replaced string
    */
@@ -366,5 +405,5 @@ public class IssueUpdatesBuilder extends Builder {
     }
     return origin;
   }
-  
+
 }
