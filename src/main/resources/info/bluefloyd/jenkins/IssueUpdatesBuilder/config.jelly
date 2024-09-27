@@ -38,6 +38,10 @@
     <f:textbox />
   </f:entry>
 
+  <f:entry title="Jira comment from file to be added" field="commentFile">
+    <f:textbox />
+  </f:entry>
+
   <f:entry title="Jira custom field to be edited" field="customFieldId">
     <f:textbox />
   </f:entry>

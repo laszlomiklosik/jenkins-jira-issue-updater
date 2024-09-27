@@ -73,7 +73,7 @@ public class RESTClient {
       findIssueURL = new URL(findIssueUrlString);
     } catch (MalformedURLException ex) {
       logger.println("Unable to parse URL string " + findIssueUrlString);
-      logger.print(ex);
+      logger.println(ex);
       return null;
     }
 
@@ -92,7 +92,7 @@ public class RESTClient {
       result = doPost(findIssueURL, bodydata);
     } catch (IOException ex) {
       logger.println("Unable to connect to REST service");
-      logger.print(ex);
+      logger.println(ex);
       return null;
     }
 
@@ -103,7 +103,7 @@ public class RESTClient {
         summaryList = mapper.readValue(result.getResultMessage(), IssueSummaryList.class);
       } catch (IOException ex) {
         logger.println("Unable to parse JSON result: " + result.getResultMessage());
-        logger.print(ex);
+        logger.println(ex);
         return null;
       }
 
@@ -131,7 +131,7 @@ public class RESTClient {
       transitionURL = new URL(transitionPath);
     } catch (MalformedURLException ex) {
       logger.println("Unable to parse URL string " + transitionPath);
-      logger.print(ex);
+      logger.println(ex);
       return;
     }
 
@@ -142,7 +142,7 @@ public class RESTClient {
         result = doGet(transitionURL);
       } catch (IOException ex) {
         logger.println("Unable to connect to REST service to check possible transitions");
-        logger.print(ex);
+        logger.println(ex);
         return;
       }
 
@@ -154,7 +154,7 @@ public class RESTClient {
           possibleTransition = mapper.readValue(result.getResultMessage(), TransitionList.class);
         } catch (IOException ex) {
           logger.println("Unable to parse JSON result: " + result.getResultMessage());
-          logger.print(ex);
+          logger.println(ex);
           return;
         }
 
@@ -166,7 +166,7 @@ public class RESTClient {
             result = doPost(transitionURL, bodydata);
           } catch (IOException ex) {
             logger.println("Unable to connect to REST service to perform transition");
-            logger.print(ex);
+            logger.println(ex);
             return;
           }
 
@@ -201,7 +201,7 @@ public class RESTClient {
       addCommentURL = new URL(issuePath);
     } catch (MalformedURLException ex) {
       logger.println("Unable to parse URL string " + issuePath);
-      logger.print(ex);
+      logger.println(ex);
       return;
     }
 
@@ -213,7 +213,7 @@ public class RESTClient {
         result = doPost(addCommentURL, bodydata);
       } catch (IOException ex) {
         logger.println("Unable to connect to REST service to add comment");
-        logger.print(ex);
+        logger.println(ex);
         return;
       }
 
